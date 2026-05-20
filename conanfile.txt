@@ -1,0 +1,12 @@
+[requires]
+cpp-httplib/0.14.3
+nlohmann_json/3.11.2
+sobjectizer/5.8.1
+sqlite3/3.45.1
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

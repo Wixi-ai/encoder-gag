@@ -1,0 +1,7 @@
+build/
+.venv/
+.vscode/
+CMakeUserPresets.json
+*.exe
+*.obj
+*.a
