@@ -9,6 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include "../../messages.hpp"
+#include "../colors.hpp"
 
 inline std::string generate_uuid() {
     std::random_device rd;
@@ -38,12 +39,12 @@ public:
     {}
 
     void so_evt_start() override {
-        std::cout << "[HTTP Agent] Server started on port 8080" << std::endl;
+        std::cout << COLOR_HTTP << "[HTTP Agent] Server started on port 8080" << COLOR_RESET << std::endl;
         
         m_server = std::make_unique<httplib::Server>();
         
         m_server->Post("/api/v1/records", [this](const httplib::Request& req, httplib::Response& res) {
-            std::cout << "[HTTP Agent] POST /api/v1/records received" << std::endl;
+            std::cout << COLOR_HTTP << "[HTTP Agent] POST /api/v1/records received" << COLOR_RESET << std::endl;
             
             msg_create_record msg;
             msg.id = generate_uuid();
@@ -51,15 +52,15 @@ public:
             msg.request_body = req.body;
             
             so_5::send<msg_create_record>(m_db_mbox, msg);
-            std::cout << "[HTTP Agent] Message sent to DB agent" << std::endl;
+            std::cout << COLOR_HTTP << "[HTTP Agent] Message sent to DB agent" << COLOR_RESET << std::endl;
             
             std::string response = "{\"status\": \"created\", \"id\": \"" + msg.id + "\"}";
             res.set_content(response, "application/json");
             res.status = 201;
         });
         
-        m_server->Get("/api/v1/records", [this](const httplib::Request&, httplib::Response& res) {
-            std::cout << "[HTTP Agent] GET /api/v1/records received" << std::endl;
+        m_server->Get("/api/v1/records", [](const httplib::Request&, httplib::Response& res) {
+            std::cout << COLOR_HTTP << "[HTTP Agent] GET /api/v1/records received (MOCK)" << COLOR_RESET << std::endl;
             res.set_content("[]", "application/json");
             res.status = 200;
         });
@@ -75,6 +76,7 @@ public:
     }
 
     void so_evt_finish() override {
+        std::cout << COLOR_HTTP << "[HTTP Agent] Shutting down..." << COLOR_RESET << std::endl;
         if (m_server) {
             m_server->stop();
         }

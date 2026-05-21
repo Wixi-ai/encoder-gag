@@ -22,7 +22,6 @@ records.db
 *.log
 *.tmp
 *.cache
-
 *.db
 
 # Windows
@@ -34,7 +33,20 @@ desktop.ini
 *.dll
 *.so
 *.dylib
+*.o
+*.obj
+*.out
+*.ilk
+*.pdb
 
 # Папка с венв (если есть)
 .venv/
 venv/
+
+# CMake
+compile_commands.json
+CMakeCache.txt
+CMakeFiles/
+
+# Логи скриптов
+*.sh.bat

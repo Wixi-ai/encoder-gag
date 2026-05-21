@@ -6,107 +6,89 @@
 #include <iostream>
 #include <vector>
 #include <utility>
+#include "colors.hpp"
 
-class Database
-{
+class Database {
 public:
-    Database(const std::string &path)
-    {
-        if (sqlite3_open(path.c_str(), &db) != SQLITE_OK)
-        {
-            std::cerr << "Ошибка открытия БД: " << sqlite3_errmsg(db) << std::endl;
-        }
-        else
-        {
-            std::cout << "[Database] Connected to " << path << std::endl;
+    Database(const std::string& path) {
+        if (sqlite3_open(path.c_str(), &db) != SQLITE_OK) {
+            std::cerr << COLOR_DB_COM << "[Database] Error opening: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        } else {
+            std::cout << COLOR_DB_COM << "[Database] Connected to " << path << COLOR_RESET << std::endl;
             createTables();
         }
     }
-
-    ~Database()
-    {
-        if (db)
-        {
+    
+    ~Database() {
+        if (db) {
             sqlite3_close(db);
-            std::cout << "[Database] Connection closed" << std::endl;
+            std::cout << COLOR_DB_COM << "[Database] Connection closed" << COLOR_RESET << std::endl;
         }
     }
-
-    void createTables()
-    {
-        const char *sql = R"(
+    
+    void createTables() {
+        const char* sql = R"(
             CREATE TABLE IF NOT EXISTS records (
                 id TEXT PRIMARY KEY,
                 file_path TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         )";
-
-        char *errMsg = nullptr;
-        if (sqlite3_exec(db, sql, nullptr, nullptr, &errMsg) != SQLITE_OK)
-        {
-            std::cerr << "Ошибка создания таблицы: " << errMsg << std::endl;
+        
+        char* errMsg = nullptr;
+        if (sqlite3_exec(db, sql, nullptr, nullptr, &errMsg) != SQLITE_OK) {
+            std::cerr << COLOR_DB_COM << "[Database] Error creating table: " << errMsg << COLOR_RESET << std::endl;
             sqlite3_free(errMsg);
-        }
-        else
-        {
-            std::cout << "[Database] Table 'records' ready" << std::endl;
+        } else {
+            std::cout << COLOR_DB_COM << "[Database] Table 'records' ready" << COLOR_RESET << std::endl;
         }
     }
-
-    bool saveRecord(const std::string &id, const std::string &file_path)
-    {
-        const char *sql = "INSERT INTO records (id, file_path) VALUES (?, ?);";
-        sqlite3_stmt *stmt;
-
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
-        {
-            std::cerr << "Ошибка подготовки запроса: " << sqlite3_errmsg(db) << std::endl;
+    
+    bool saveRecord(const std::string& id, const std::string& file_path) {
+        const char* sql = "INSERT INTO records (id, file_path) VALUES (?, ?);";
+        sqlite3_stmt* stmt;
+        
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            std::cerr << COLOR_DB_COM << "[Database] Prepare error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
             return false;
         }
-
+        
         sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 2, file_path.c_str(), -1, SQLITE_STATIC);
-
-        if (sqlite3_step(stmt) != SQLITE_DONE)
-        {
-            std::cerr << "Ошибка вставки: " << sqlite3_errmsg(db) << std::endl;
+        
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << COLOR_DB_COM << "[Database] Insert error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
             sqlite3_finalize(stmt);
             return false;
         }
-
+        
         sqlite3_finalize(stmt);
-        std::cout << "[Database] Record saved: " << id << std::endl;
+        std::cout << COLOR_DB_COM << "[Database] Record saved: " << id << COLOR_RESET << std::endl;
         return true;
     }
-
-    std::vector<std::pair<std::string, std::string>> getAllRecords()
-    {
+    
+    std::vector<std::pair<std::string, std::string>> getAllRecords() {
         std::vector<std::pair<std::string, std::string>> records;
-        const char *sql = "SELECT id, file_path FROM records;";
-        sqlite3_stmt *stmt;
-
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK)
-        {
-            while (sqlite3_step(stmt) == SQLITE_ROW)
-            {
-                std::string id = (const char *)sqlite3_column_text(stmt, 0);
-                std::string path = (const char *)sqlite3_column_text(stmt, 1);
+        const char* sql = "SELECT id, file_path FROM records;";
+        sqlite3_stmt* stmt;
+        
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                std::string id = (const char*)sqlite3_column_text(stmt, 0);
+                std::string path = (const char*)sqlite3_column_text(stmt, 1);
                 records.push_back({id, path});
-                std::cout << "[Database] Found record: " << id << " -> " << path << std::endl;
+                std::cout << COLOR_DB_COM << "[Database] Found record: " << id << " -> " << path << COLOR_RESET << std::endl;
             }
+        } else {
+            std::cerr << COLOR_DB_COM << "[Database] Read error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
         }
-        else
-        {
-            std::cerr << "Ошибка чтения: " << sqlite3_errmsg(db) << std::endl;
-        }
-
+        
         sqlite3_finalize(stmt);
         return records;
     }
 
 private:
-    sqlite3 *db = nullptr;
+    sqlite3* db = nullptr;
 };
 
 #endif
