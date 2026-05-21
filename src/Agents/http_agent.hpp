@@ -17,29 +17,30 @@ public:
 
   void so_evt_start() override
   {
-    std::cout << "[HTTP Agent] Сервер запущен на порту 8080" << std::endl;
+    std::cout << "[HTTP Agent] Server started on port 8080" << std::endl;
 
     m_server = std::make_unique<httplib::Server>();
 
-    // Обработчик POST запросов
     m_server->Post("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res)
                    {
-            std::cout << "[HTTP Agent] Получен POST запрос" << std::endl;
+            std::cout << "[HTTP Agent] POST /api/v1/records received" << std::endl;
 
-            // Создаём сообщение для DB агента
             msg_create_record msg;
-            msg.id = "123e4567-e89b-12d3-a456-426614174000";  // временный ID
-            msg.file_path = "C:/test/video.mp4";               // временный путь
-            msg.request_body = req.body;                        // тело запроса
+            msg.id = "123e4567-e89b-12d3-a456-426614174000";
+            msg.file_path = "C:/test/video.mp4";
+            msg.request_body = req.body;
 
-            // Отправляем сообщение DB агенту
             so_5::send<msg_create_record>(m_db_mbox, msg);
+            std::cout << "[HTTP Agent] Message sent to DB agent" << std::endl;
 
-            std::cout << "[HTTP Agent] Отправлено msg_create_record DB агенту" << std::endl;
-
-            // Отвечаем клиенту
-            res.set_content("{\"status\": \"created\", \"id\": \"" + msg.id + "\"}", "application/json");
+            std::string response = "{\"status\": \"created\", \"id\": \"" + msg.id + "\"}";
+            res.set_content(response, "application/json");
             res.status = 201; });
+
+    m_server->Get("/health", [](const httplib::Request &, httplib::Response &res)
+                  {
+            res.set_content("OK", "text/plain");
+            res.status = 200; });
 
     m_server_thread = std::thread([this]()
                                   { m_server->listen("localhost", 8080); });

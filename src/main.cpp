@@ -3,7 +3,6 @@
 #include "agents/http_agent.hpp"
 #include <thread>
 #include <chrono>
-#include <httplib.h> // Добавляем для клиента
 #include <windows.h>
 
 int main()
@@ -11,45 +10,37 @@ int main()
   SetConsoleOutputCP(CP_UTF8);
   SetConsoleCP(CP_UTF8);
 
+  std::cout << "========================================" << std::endl;
+  std::cout << "  encoders_gag server starting..." << std::endl;
+  std::cout << "========================================" << std::endl;
+
   so_5::launch([](so_5::environment_t &env)
                {
-        // Создаём DB агента
         auto db_mbox = env.introduce_coop([](so_5::coop_t& coop) {
             return coop.make_agent<db_agent_t>()->so_direct_mbox();
         });
 
-        // Создаём HTTP агента (сервер)
         env.introduce_coop([&](so_5::coop_t& coop) {
             coop.make_agent<http_agent_t>(db_mbox);
         });
 
-        // Отправляем тестовые сообщения
         so_5::send<msg_hello>(db_mbox, msg_hello{"from main"});
         so_5::send<msg_bye>(db_mbox, msg_bye{"from main"});
 
-        // Ждём, пока сервер запустится
         std::this_thread::sleep_for(std::chrono::seconds(2));
 
-        // ===== НОВЫЙ КОД: САМИ ОТПРАВЛЯЕМ ЗАПРОС =====
-        std::cout << "\n========== ОТПРАВКА ТЕСТОВОГО ЗАПРОСА ==========" << std::endl;
-
-        // Создаём HTTP клиент
+        std::cout << "\n[MAIN] Sending test HTTP request..." << std::endl;
         httplib::Client client("localhost", 8080);
+        auto res = client.Post("/api/v1/records", "{\"test\": \"data\"}", "application/json");
 
-        // Отправляем POST запрос
-        auto res = client.Post("/api/v1/records", "test", "text/plain");
-
-        // Выводим ответ
         if (res) {
-            std::cout << "Ответ от сервера: " << res->body << std::endl;
-            std::cout << "Статус: " << res->status << std::endl;
+            std::cout << "[MAIN] Server response: " << res->body << std::endl;
         } else {
-            std::cout << "Ошибка: не удалось отправить запрос" << std::endl;
+            std::cout << "[MAIN] Failed to send request" << std::endl;
         }
 
-        std::cout << "================================================\n" << std::endl;
+        std::cout << "\n[MAIN] Server is running. Press Ctrl+C to exit..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(30)); });
 
-        // Держим программу открытой, чтобы увидеть логи
-        std::this_thread::sleep_for(std::chrono::seconds(5)); });
   return 0;
 }

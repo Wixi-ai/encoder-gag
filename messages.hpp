@@ -33,18 +33,18 @@ struct AudioStream
   std::string extra;
 };
 
-// ===== Запрос на создание записи (POST /api/v1/records) =====
+// ===== Запрос на создание записи =====
 
 struct RecordCreateRequest
 {
-  std::string id; // UUID
+  std::string id;
   int block_size;
   std::string fblock;
   std::vector<VideoStream> video_streams;
   std::vector<AudioStream> audio_streams;
 };
 
-// ===== Сообщения для SObjectizer =====
+// ===== Сообщения для акторов =====
 
 struct msg_hello
 {
@@ -56,12 +56,17 @@ struct msg_bye
   std::string name;
 };
 
-// Сообщение для создания записи (от HTTP к DB)
 struct msg_create_record
 {
-  std::string id;           // UUID записи
-  std::string file_path;    // путь к файлу
-  std::string request_body; // сырое тело запроса
+  std::string id;
+  std::string file_path;
+  std::string request_body;
+};
+
+struct msg_create_response
+{
+  bool success;
+  std::string error_message;
 };
 
 #endif
