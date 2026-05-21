@@ -57,5 +57,9 @@ struct msg_create_record
 {
   RecordCreateRequest request;
 };
+struct msg_bye
+{
+  std::string name;
+};
 
 #endif

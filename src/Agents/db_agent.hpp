@@ -12,8 +12,13 @@ public:
 
   void so_define_agent() override
   {
+    // Обработчик для msg_hello
     so_subscribe_self().event([](const msg_hello &msg)
-                              { std::cout << "[DB Agent] Привет, " << msg.name << "!" << std::endl; });
+                              { std::cout << "[DB Agent] Hello " << msg.name << "!" << std::endl; });
+
+    // Обработчик для msg_bye
+    so_subscribe_self().event([](const msg_bye &msg)
+                              { std::cout << "[DB Agent] Bye, " << msg.name << "!" << std::endl; });
   }
 };
 

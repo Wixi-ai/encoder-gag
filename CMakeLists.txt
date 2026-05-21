@@ -25,5 +25,8 @@ target_link_libraries(${PROJECT_NAME}
     nlohmann_json::nlohmann_json
     sobjectizer::StaticLib
     SQLite::SQLite3
-    ws2_32                  # Не забудь про сеть!
+    ws2_32
 )
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} ws2_32)
+endif()
