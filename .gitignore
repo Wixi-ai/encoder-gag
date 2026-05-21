@@ -18,9 +18,12 @@ CMakeUserPresets.json
 *.swo
 
 # Временные файлы
+records.db
 *.log
 *.tmp
 *.cache
+
+*.db
 
 # Windows
 Thumbs.db
