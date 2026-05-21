@@ -46,20 +46,22 @@ struct RecordCreateRequest
 
 // ===== Сообщения для SObjectizer =====
 
-// Старое сообщение (пока оставим)
 struct msg_hello
 {
   std::string name;
 };
 
-// Новое сообщение для создания записи
-struct msg_create_record
-{
-  RecordCreateRequest request;
-};
 struct msg_bye
 {
   std::string name;
+};
+
+// Сообщение для создания записи (от HTTP к DB)
+struct msg_create_record
+{
+  std::string id;           // UUID записи
+  std::string file_path;    // путь к файлу
+  std::string request_body; // сырое тело запроса
 };
 
 #endif
