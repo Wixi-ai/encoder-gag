@@ -29,14 +29,18 @@ public:
             std::cout << "  file_path: " << msg.file_path << std::endl;
             std::cout << "  request_body: " << msg.request_body << std::endl;
             
-            // Сохраняем в БД
             if (m_db.saveRecord(msg.id, msg.file_path)) {
                 std::cout << "  status: SAVED TO DATABASE" << std::endl;
             } else {
                 std::cout << "  status: SAVE FAILED" << std::endl;
             }
-            
             std::cout << "==============================\n" << std::endl;
+        });
+        
+        so_subscribe_self().event([this](const msg_get_records& msg) {
+            std::cout << "[DB Agent] Get all records request" << std::endl;
+            auto records = m_db.getAllRecords();
+            std::cout << "[DB Agent] Found " << records.size() << " records" << std::endl;
         });
     }
 

@@ -14,31 +14,42 @@ int main() {
     std::cout << "========================================" << std::endl;
     
     so_5::launch([](so_5::environment_t& env) {
-        // Создаём DB агента (теперь без передачи mbox)
+        // Создаём DB агента (без аргументов)
         auto db_mbox = env.introduce_coop([](so_5::coop_t& coop) {
             return coop.make_agent<db_agent_t>()->so_direct_mbox();
         });
         
-        // Создаём HTTP агента (передаём mbox DB агента)
+        // Создаём HTTP агента с передачей db_mbox
         env.introduce_coop([&](so_5::coop_t& coop) {
             coop.make_agent<http_agent_t>(db_mbox);
         });
         
-        // Тестовые сообщения
+        std::cout << "[MAIN] Agents created" << std::endl;
+        
+        // Тестовые сообщения DB агенту
         so_5::send<msg_hello>(db_mbox, msg_hello{"from main"});
         so_5::send<msg_bye>(db_mbox, msg_bye{"from main"});
         
         std::this_thread::sleep_for(std::chrono::seconds(2));
         
-        // Тестовый HTTP запрос
-        std::cout << "\n[MAIN] Sending test HTTP request..." << std::endl;
+        // Тестовый POST запрос
+        std::cout << "\n[MAIN] Sending test POST request..." << std::endl;
         httplib::Client client("localhost", 8080);
-        auto res = client.Post("/api/v1/records", "{\"test\": \"data\"}", "application/json");
+        auto post_res = client.Post("/api/v1/records", "{\"test\": \"data\"}", "application/json");
         
-        if (res) {
-            std::cout << "[MAIN] Server response: " << res->body << std::endl;
+        if (post_res) {
+            std::cout << "[MAIN] POST response: " << post_res->body << std::endl;
         } else {
-            std::cout << "[MAIN] Failed to send request" << std::endl;
+            std::cout << "[MAIN] POST failed" << std::endl;
+        }
+        
+        // Тестовый GET запрос
+        std::cout << "\n[MAIN] Sending test GET request..." << std::endl;
+        auto get_res = client.Get("/api/v1/records");
+        if (get_res) {
+            std::cout << "[MAIN] GET response: " << get_res->body << std::endl;
+        } else {
+            std::cout << "[MAIN] GET failed" << std::endl;
         }
         
         std::cout << "\n[MAIN] Server is running. Press Ctrl+C to exit..." << std::endl;
