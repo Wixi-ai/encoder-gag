@@ -24,7 +24,7 @@ cd encoders_gag
 ### 2. Сборка проекта
 
 ```bash
-./logs.sh
+./Start.sh
 ```
 
 Скрипт автоматически:
