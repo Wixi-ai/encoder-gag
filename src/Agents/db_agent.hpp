@@ -42,18 +42,17 @@ public:
             }
         });
         
-        // НОВЫЙ ОБРАБОТЧИК для GET запроса
+        // Обработчик GET запроса
         so_subscribe_self().event([this](const msg_get_records& msg) {
-            std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORDS request" << COLOR_RESET << std::endl;
+            std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORDS request #" << msg.request_id << COLOR_RESET << std::endl;
             
             auto records = m_db.getAllRecords();
             std::cout << COLOR_DB << "  found: " << records.size() << " records" << COLOR_RESET << std::endl;
             
-            // Формируем ответ
             msg_get_records_response response;
+            response.request_id = msg.request_id;
             response.records = records;
             
-            // Отправляем ответ обратно HTTP-агенту
             so_5::send<msg_get_records_response>(msg.reply_to, response);
         });
     }

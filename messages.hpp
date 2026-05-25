@@ -62,23 +62,16 @@ struct msg_create_response {
     std::string error_message;
 };
 
+// Запрос на получение всех записей
 struct msg_get_records {
-    // пустое сообщение-запрос
-};
-
-struct msg_get_records_response {
-    std::vector<std::pair<std::string, std::string>> records;
-};
-
-#endif
-
-// Запрос на получение всех записей (с указанием, куда отвечать)
-struct msg_get_records {
-    so_5::mbox_t reply_to;  // обратный адрес для ответа
+    int request_id;
+    so_5::mbox_t reply_to;
 };
 
 // Ответ со списком записей
 struct msg_get_records_response {
+    int request_id;
     std::vector<std::pair<std::string, std::string>> records;
 };
 
+#endif
