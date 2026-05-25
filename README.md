@@ -47,19 +47,19 @@ cd encoders_gag
 | GET | `/api/v1/records` | Получение списка записей |
 | GET | `/health` | Проверка состояния сервера |
 
-### Пример запроса
+## 🚀 Быстрые скрипты для тестирования
+
+В папке `scripts/` находятся удобные скрипты для проверки API:
 
 ```bash
-# Создание записи
-curl -X POST http://localhost:8080/api/v1/records \
-  -H "Content-Type: application/json" \
-  -d '{"test": "data"}'
+# Проверка здоровья сервера
+./scripts/health.sh
+
+# Создание новой записи
+./scripts/create.sh
 
 # Получение всех записей
-curl http://localhost:8080/api/v1/records
-
-# Проверка здоровья
-curl http://localhost:8080/health
+./scripts/get.sh
 ```
 
 ## 🧪 Проверка работы сервера
