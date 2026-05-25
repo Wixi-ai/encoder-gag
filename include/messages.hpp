@@ -1,53 +1,13 @@
-#ifndef MESSAGES_HPP
-#define MESSAGES_HPP
+#pragma once
 
 #include <string>
 #include <vector>
 #include <so_5/all.hpp>
 
-struct TimeBase {
-    int num;
-    int den;
-};
-
-struct VideoStream {
-    int id;
-    std::string codec;
-    int width;
-    int height;
-    TimeBase time_base;
-    std::string extra;
-};
-
-struct AudioStream {
-    int id;
-    std::string codec;
-    int sample_rate;
-    int channels;
-    std::string channel_layout;
-    TimeBase time_base;
-    std::string extra;
-};
-
-struct RecordCreateRequest {
-    std::string id;
-    int block_size;
-    std::string fblock;
-    std::vector<VideoStream> video_streams;
-    std::vector<AudioStream> audio_streams;
-};
-
-
-
 struct msg_create_record {
     std::string id;
     std::string file_path;
     std::string request_body;
-};
-
-struct msg_create_response {
-    bool success;
-    std::string error_message;
 };
 
 struct msg_get_records {
@@ -59,5 +19,3 @@ struct msg_get_records_response {
     int request_id;
     std::vector<std::pair<std::string, std::string>> records;
 };
-
-#endif

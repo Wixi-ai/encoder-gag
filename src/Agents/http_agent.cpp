@@ -12,7 +12,7 @@ http_agent_t::http_agent_t(context_t ctx, so_5::mbox_t db_mbox)
 
 void http_agent_t::so_evt_start()
 {
-    printBanner();
+    printStartupInfo();
 
     m_server = std::make_unique<httplib::Server>();
 
@@ -29,7 +29,7 @@ void http_agent_t::so_evt_start()
         msg.request_body = req.body;
 
         so_5::send<msg_create_record>(m_db_mbox, msg);
-        printArrow("->", "DB Agent", "sent");
+        std::cout << COLOR_HTTP << "  -> DB Agent | sent" << COLOR_RESET << std::endl;
 
         std::string response = "{\"status\": \"created\", \"id\": \"" + uuid + "\"}";
         res.set_content(response, "application/json");
@@ -50,7 +50,7 @@ void http_agent_t::so_evt_start()
             m_pending_requests[request_id] = promise;
         }
 
-        printArrow("->", "DB Agent", "request #" + std::to_string(request_id));
+        std::cout << COLOR_HTTP << "  -> DB Agent | request #" << request_id << COLOR_RESET << std::endl;
 
         so_5::send<msg_get_records>(m_db_mbox, request_id, so_direct_mbox());
 
@@ -64,10 +64,10 @@ void http_agent_t::so_evt_start()
             res.set_content(j.dump(), "application/json");
             res.status = 200;
 
-            printArrow("<-", "DB Agent", "response with " + std::to_string(response.records.size()) + " records");
+            std::cout << COLOR_HTTP << "  <- DB Agent | response with " << response.records.size() << " records" << COLOR_RESET << std::endl;
             printResponse(200, j.dump().substr(0, 80) + (j.dump().size() > 80 ? "..." : ""));
         } else {
-            printError("Timeout waiting for DB response");
+            std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
         } });
@@ -76,8 +76,6 @@ void http_agent_t::so_evt_start()
                   {
         res.set_content("OK", "text/plain");
         res.status = 200; });
-
-    printServerReady();
 
     m_server_thread = std::thread([this]()
                                   { m_server->listen("localhost", 8080); });
@@ -95,7 +93,7 @@ void http_agent_t::so_evt_finish()
     }
 }
 
-void http_agent_t::printBanner()
+void http_agent_t::printStartupInfo()
 {
     std::cout << COLOR_MAIN << R"(
   ================================================================
@@ -105,48 +103,8 @@ void http_agent_t::printBanner()
   ||                  HTTP: localhost:8080                      ||
   ||                  API:  /api/v1/records                     ||
   ================================================================
-)" << COLOR_RESET
-              << std::endl;
-}
+)" << COLOR_RESET << std::endl;
 
-void http_agent_t::printRequest(const std::string &method, const std::string &path, int num, const std::string &id, const std::string &body)
-{
-    std::cout << COLOR_HTTP << "\n  +-----------------------------------------------------------+\n"
-              << "  | " << std::left << std::setw(55) << (method + " #" + std::to_string(num) + " | " + path) << " |\n"
-              << "  +-----------------------------------------------------------+\n";
-    if (!id.empty())
-    {
-        std::cout << "  | ID:   " << std::left << std::setw(52) << id << " |\n";
-    }
-    if (!body.empty())
-    {
-        std::string short_body = body.size() > 45 ? body.substr(0, 42) + "..." : body;
-        std::cout << "  | Body: " << std::left << std::setw(51) << short_body << " |\n";
-    }
-    std::cout << "  +-----------------------------------------------------------+\n"
-              << COLOR_RESET;
-}
-
-void http_agent_t::printArrow(const std::string &arrow, const std::string &target, const std::string &msg)
-{
-    std::cout << COLOR_HTTP << "  " << arrow << " " << target << " | " << msg << COLOR_RESET << std::endl;
-}
-
-void http_agent_t::printResponse(int status, const std::string &body)
-{
-    std::string color = (status >= 200 && status < 300) ? COLOR_GREEN : COLOR_RED;
-    std::cout << color << "  <- Response | Status: " << status << "\n"
-              << "  <- Body     | " << (body.size() > 55 ? body.substr(0, 52) + "..." : body) << "\n"
-              << COLOR_RESET;
-}
-
-void http_agent_t::printError(const std::string &msg)
-{
-    std::cout << COLOR_RED << "  [ERROR] " << msg << COLOR_RESET << std::endl;
-}
-
-void http_agent_t::printServerReady()
-{
     std::cout << COLOR_GREEN << R"(
   +-----------------------------------------------------------+
   |  [OK] SERVER STARTED SUCCESSFULLY                         |
@@ -174,6 +132,31 @@ void http_agent_t::printServerReady()
   |    # Get all records                                                         |
   |    curl --noproxy "localhost" http://localhost:8080/api/v1/records           |
   +------------------------------------------------------------------------------+
-)" << COLOR_RESET
-              << std::endl;
+)" << COLOR_RESET << std::endl;
+}
+
+void http_agent_t::printRequest(const std::string &method, const std::string &path, int num, const std::string &id, const std::string &body)
+{
+    std::cout << COLOR_HTTP << "\n  +-----------------------------------------------------------+\n"
+              << "  | " << std::left << std::setw(55) << (method + " #" + std::to_string(num) + " | " + path) << " |\n"
+              << "  +-----------------------------------------------------------+\n";
+    if (!id.empty())
+    {
+        std::cout << "  | ID:   " << std::left << std::setw(52) << id << " |\n";
+    }
+    if (!body.empty())
+    {
+        std::string short_body = body.size() > 45 ? body.substr(0, 42) + "..." : body;
+        std::cout << "  | Body: " << std::left << std::setw(51) << short_body << " |\n";
+    }
+    std::cout << "  +-----------------------------------------------------------+\n"
+              << COLOR_RESET;
+}
+
+void http_agent_t::printResponse(int status, const std::string &body)
+{
+    std::string color = (status >= 200 && status < 300) ? COLOR_GREEN : COLOR_RED;
+    std::cout << color << "  <- Response | Status: " << status << "\n"
+              << "  <- Body     | " << (body.size() > 55 ? body.substr(0, 52) + "..." : body) << "\n"
+              << COLOR_RESET;
 }

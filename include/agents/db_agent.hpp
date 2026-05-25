@@ -1,5 +1,4 @@
-#ifndef DB_AGENT_HPP
-#define DB_AGENT_HPP
+#pragma once
 
 #include <so_5/all.hpp>
 #include <iostream>
@@ -11,7 +10,6 @@
 class db_agent_t : public so_5::agent_t {
 public:
     db_agent_t(context_t ctx);
-
     void so_define_agent() override;
 
 private:
@@ -19,5 +17,3 @@ private:
     int m_create_counter;
     int m_total_saved;
 };
-
-#endif

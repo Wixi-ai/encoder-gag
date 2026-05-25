@@ -1,5 +1,4 @@
-#ifndef DATABASE_HPP
-#define DATABASE_HPP
+#pragma once
 
 #include <sqlite3.h>
 #include <string>
@@ -10,7 +9,7 @@ class Database {
 public:
     Database(const std::string& path);
     ~Database();
-    
+
     bool saveRecord(const std::string& id, const std::string& file_path);
     std::vector<std::pair<std::string, std::string>> getAllRecords();
 
@@ -18,5 +17,3 @@ private:
     sqlite3* db = nullptr;
     void createTables();
 };
-
-#endif

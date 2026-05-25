@@ -1,5 +1,4 @@
-#ifndef HTTP_AGENT_HPP
-#define HTTP_AGENT_HPP
+#pragma once
 
 #include <so_5/all.hpp>
 #include <httplib.h>
@@ -16,13 +15,6 @@
 #include "../colors.hpp"
 #include "../utils.hpp"
 
-using json = nlohmann::json;
-
-struct PendingRequest {
-    std::promise<msg_get_records_response> promise;
-    std::atomic<bool> completed{false};
-};
-
 class http_agent_t : public so_5::agent_t {
 public:
     http_agent_t(context_t ctx, so_5::mbox_t db_mbox);
@@ -30,13 +22,9 @@ public:
     void so_evt_finish() override;
 
 private:
-    void printBanner();
+    void printStartupInfo();
     void printRequest(const std::string& method, const std::string& path, int num, const std::string& id, const std::string& body);
-    void printArrow(const std::string& arrow, const std::string& target, const std::string& msg);
     void printResponse(int status, const std::string& body);
-    void printError(const std::string& msg);
-    void printServerReady();
-    void printShutdown();
 
     so_5::mbox_t m_db_mbox;
     std::unique_ptr<httplib::Server> m_server;
@@ -46,5 +34,3 @@ private:
     std::unordered_map<int, std::shared_ptr<std::promise<msg_get_records_response>>> m_pending_requests;
     std::mutex m_pending_mutex;
 };
-
-#endif

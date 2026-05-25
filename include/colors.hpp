@@ -1,5 +1,4 @@
-#ifndef COLORS_HPP
-#define COLORS_HPP
+#pragma once
 
 // ANSI цветовые коды для консоли
 #define COLOR_RESET   "\033[0m"
@@ -28,5 +27,3 @@
 #define COLOR_DB     COLOR_GREEN BOLD
 #define COLOR_MAIN   COLOR_MAGENTA BOLD
 #define COLOR_DB_COM COLOR_BLUE
-
-#endif

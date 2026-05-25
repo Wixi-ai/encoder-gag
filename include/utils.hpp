@@ -1,5 +1,4 @@
-#ifndef UTILS_HPP
-#define UTILS_HPP
+#pragma once
 
 #include <string>
 #include <chrono>
@@ -26,7 +25,7 @@ inline std::string generate_uuid() {
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 15);
     std::uniform_int_distribution<> dis2(8, 11);
-    
+
     std::stringstream ss;
     ss << std::hex << std::setfill('0');
     for (int i = 0; i < 36; i++) {
@@ -40,5 +39,3 @@ inline std::string generate_uuid() {
     }
     return ss.str();
 }
-
-#endif
