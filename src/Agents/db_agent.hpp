@@ -3,7 +3,6 @@
 
 #include <so_5/all.hpp>
 #include <iostream>
-#include <iomanip>
 #include "../../messages.hpp"
 #include "../database.hpp"
 #include "../colors.hpp"
@@ -43,12 +42,19 @@ public:
             }
         });
         
+        // НОВЫЙ ОБРАБОТЧИК для GET запроса
         so_subscribe_self().event([this](const msg_get_records& msg) {
+            std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORDS request" << COLOR_RESET << std::endl;
+            
             auto records = m_db.getAllRecords();
-            std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORDS - found: " << records.size() << COLOR_RESET << std::endl;
-            for (const auto& rec : records) {
-                std::cout << COLOR_DB << "  - " << rec.first.substr(0, 8) << "... -> " << rec.second << COLOR_RESET << std::endl;
-            }
+            std::cout << COLOR_DB << "  found: " << records.size() << " records" << COLOR_RESET << std::endl;
+            
+            // Формируем ответ
+            msg_get_records_response response;
+            response.records = records;
+            
+            // Отправляем ответ обратно HTTP-агенту
+            so_5::send<msg_get_records_response>(msg.reply_to, response);
         });
     }
 
