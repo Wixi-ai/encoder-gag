@@ -71,3 +71,14 @@ struct msg_get_records_response {
 };
 
 #endif
+
+// Запрос на получение всех записей (с указанием, куда отвечать)
+struct msg_get_records {
+    so_5::mbox_t reply_to;  // обратный адрес для ответа
+};
+
+// Ответ со списком записей
+struct msg_get_records_response {
+    std::vector<std::pair<std::string, std::string>> records;
+};
+
