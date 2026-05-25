@@ -121,16 +121,16 @@ void http_agent_t::printStartupInfo()
     std::cout << COLOR_MAIN << R"(
   +------------------------------------------------------------------------------+
   |  TEST COMMANDS (run in another terminal):                                    |
+  |                                                                              |
   |    # Health check                                                            |
-  |    curl --noproxy "localhost" http://localhost:8080/health                   |
+  |    ./scripts/health.sh                                                       |
   |                                                                              |
   |    # Create record                                                           |
-  |    curl --noproxy "localhost" -X POST http://localhost:8080/api/v1/records \ |
-  |         -H "Content-Type: application/json" \                                |
-  |         -d '{"test":"data"}'                                                 |
+  |    ./scripts/create.sh                                                       |
   |                                                                              |
   |    # Get all records                                                         |
-  |    curl --noproxy "localhost" http://localhost:8080/api/v1/records           |
+  |    ./scripts/get.sh                                                          |
+  |                                                                              |
   +------------------------------------------------------------------------------+
 )" << COLOR_RESET << std::endl;
 }
