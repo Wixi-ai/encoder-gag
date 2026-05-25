@@ -4,13 +4,19 @@ echo "========================================="
 echo "  Сборка encoders_gag"
 echo "========================================="
 
+# Устанавливаем зависимости
 conan install . --output-folder=build --build=missing
 
-cmake -S . -B build -G "MinGW Makefiles" \
-    -DCMAKE_BUILD_TYPE=Release \
-    
+# Переходим в build
+cd build
 
-cmake --build build
+# Конфигурируем CMake с правильным путём к toolchain
+cmake .. -G "MinGW Makefiles" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE="build/Release/generators/conan_toolchain.cmake"
+
+# Собираем
+cmake --build . --config Release
 
 echo "========================================="
 echo "  Сборка завершена!"
