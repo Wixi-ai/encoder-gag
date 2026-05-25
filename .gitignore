@@ -1,7 +1,52 @@
+# Сборка
 build/
-.venv/
-.vscode/
+build-*/
+cmake-build-*/
+
+# Conan
+conaninfo.txt
+conanbuildinfo.*
+conanbuild.bat
+conanrun.bat
+conan_toolchain.cmake
 CMakeUserPresets.json
+
+# Среда разработки
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Временные файлы
+records.db
+*.log
+*.tmp
+*.cache
+*.db
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Скомпилированные файлы
 *.exe
+*.dll
+*.so
+*.dylib
+*.o
 *.obj
-*.a
+*.out
+*.ilk
+*.pdb
+
+# Папка с венв (если есть)
+.venv/
+venv/
+
+# CMake
+compile_commands.json
+CMakeCache.txt
+CMakeFiles/
+
+# Логи скриптов
+*.sh.bat
