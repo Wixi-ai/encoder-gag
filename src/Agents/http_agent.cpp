@@ -14,6 +14,26 @@ void http_agent_t::so_evt_start()
 {
     printStartupInfo();
 
+    // Подписываемся на ответы от DB-агента для POST
+    so_subscribe_self().event([this](const msg_create_response& response) {
+        auto it = m_pending_creates.find(response.id);
+        if (it != m_pending_creates.end()) {
+            it->second->set_value(response.success);
+            std::lock_guard<std::mutex> lock(m_creates_mutex);
+            m_pending_creates.erase(it);
+        }
+    });
+
+    // Подписываемся на ответы от DB-агента для GET
+    so_subscribe_self().event([this](const msg_get_records_response& response) {
+        auto it = m_pending_requests.find(response.request_id);
+        if (it != m_pending_requests.end()) {
+            it->second->set_value(response);
+            std::lock_guard<std::mutex> lock(m_pending_mutex);
+            m_pending_requests.erase(it);
+        }
+    });
+
     m_server = std::make_unique<httplib::Server>();
 
     m_server->Post("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res)
@@ -23,19 +43,37 @@ void http_agent_t::so_evt_start()
 
         printRequest("POST", "/api/v1/records", m_request_counter, uuid.substr(0, 8), req.body);
 
+        // Создаём promise для ожидания ответа от DB-агента
+        auto promise = std::make_shared<std::promise<bool>>();
+        auto future = promise->get_future();
+
+        {
+            std::lock_guard<std::mutex> lock(m_creates_mutex);
+            m_pending_creates[uuid] = promise;
+        }
+
         msg_create_record msg;
         msg.id = uuid;
         msg.file_path = "C:/test/video.mp4";
         msg.request_body = req.body;
+        msg.reply_to = so_direct_mbox();
 
         so_5::send<msg_create_record>(m_db_mbox, msg);
-        std::cout << COLOR_HTTP << "  -> DB Agent | sent" << COLOR_RESET << std::endl;
+        std::cout << COLOR_HTTP << "  -> DB Agent | sent, waiting for response" << COLOR_RESET << std::endl;
 
-        std::string response = "{\"status\": \"created\", \"id\": \"" + uuid + "\"}";
-        res.set_content(response, "application/json");
-        res.status = 201;
-
-        printResponse(201, response); });
+        // Ждём ответ 5 секунд
+        auto status = future.wait_for(std::chrono::seconds(5));
+        if (status == std::future_status::ready && future.get()) {
+            std::string response = "{\"status\": \"created\", \"id\": \"" + uuid + "\"}";
+            res.set_content(response, "application/json");
+            res.status = 201;
+            printResponse(201, response);
+        } else {
+            std::cout << COLOR_RED << "  [ERROR] Failed to save record or timeout" << COLOR_RESET << std::endl;
+            res.set_content("{\"error\": \"failed to save record\"}", "application/json");
+            res.status = 500;
+            printResponse(500, "{\"error\": \"failed to save record\"}");
+        } });
 
     m_server->Get("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res)
                   {

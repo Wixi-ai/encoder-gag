@@ -8,6 +8,13 @@ struct msg_create_record {
     std::string id;
     std::string file_path;
     std::string request_body;
+    so_5::mbox_t reply_to;
+};
+
+struct msg_create_response {
+    std::string id;
+    bool success;
+    std::string error_message;
 };
 
 struct msg_get_records {

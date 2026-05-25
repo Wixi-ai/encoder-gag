@@ -16,7 +16,17 @@ void db_agent_t::so_define_agent() {
         std::cout << COLOR_DB << "  path: " << msg.file_path << COLOR_RESET << std::endl;
         std::cout << COLOR_DB << "  body: " << msg.request_body << COLOR_RESET << std::endl;
 
-        if (m_db.saveRecord(msg.id, msg.file_path)) {
+        bool success = m_db.saveRecord(msg.id, msg.file_path);
+        
+        // Отправляем ответ HTTP-агенту
+        msg_create_response response;
+        response.id = msg.id;
+        response.success = success;
+        response.error_message = success ? "" : "Failed to save to database";
+        
+        so_5::send<msg_create_response>(msg.reply_to, response);
+        
+        if (success) {
             m_total_saved++;
             std::cout << COLOR_DB << "  result: SAVED (total: " << m_total_saved << ")" << COLOR_RESET << std::endl;
         } else {
