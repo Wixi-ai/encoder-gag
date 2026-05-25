@@ -1,16 +1,11 @@
 #include <so_5/all.hpp>
-#include "agents/db_agent.hpp"
-#include "agents/http_agent.hpp"
-#include "colors.hpp"
-#include "utils.hpp"
+#include "../include/agents/db_agent.hpp"
+#include "../include/agents/http_agent.hpp"
+#include "../include/colors.hpp"
 #include <thread>
 #include <chrono>
-#include <windows.h>
 
 int main() {
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-    
     std::cout << COLOR_MAIN << "========================================" << COLOR_RESET << std::endl;
     std::cout << COLOR_MAIN << "  ENCODERS_GAG v1.0 STARTING" << COLOR_RESET << std::endl;
     std::cout << COLOR_MAIN << "========================================" << COLOR_RESET << std::endl;

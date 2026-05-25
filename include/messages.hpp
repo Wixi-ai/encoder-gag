@@ -5,8 +5,6 @@
 #include <vector>
 #include <so_5/all.hpp>
 
-// ===== Вспомогательные структуры =====
-
 struct TimeBase {
     int num;
     int den;
@@ -31,8 +29,6 @@ struct AudioStream {
     std::string extra;
 };
 
-// ===== Запрос на создание записи =====
-
 struct RecordCreateRequest {
     std::string id;
     int block_size;
@@ -40,8 +36,6 @@ struct RecordCreateRequest {
     std::vector<VideoStream> video_streams;
     std::vector<AudioStream> audio_streams;
 };
-
-// ===== Сообщения для акторов =====
 
 struct msg_hello {
     std::string name;
@@ -62,13 +56,11 @@ struct msg_create_response {
     std::string error_message;
 };
 
-// Запрос на получение всех записей
 struct msg_get_records {
     int request_id;
     so_5::mbox_t reply_to;
 };
 
-// Ответ со списком записей
 struct msg_get_records_response {
     int request_id;
     std::vector<std::pair<std::string, std::string>> records;

@@ -24,10 +24,9 @@
 #define UNDERLINE "\033[4m"
 
 // Цвета для компонентов проекта
-#define COLOR_HTTP   COLOR_CYAN    BOLD    // HTTP агент — яркий голубой
-#define COLOR_DB     COLOR_GREEN   BOLD    // DB агент — яркий зелёный
-#define COLOR_MAIN   COLOR_MAGENTA BOLD    // MAIN — яркий фиолетовый
-#define COLOR_SERVER COLOR_YELLOW  BOLD    // SERVER — яркий жёлтый
-#define COLOR_DB_COM COLOR_BLUE             // Database — синий (без bold)
+#define COLOR_HTTP   COLOR_CYAN BOLD
+#define COLOR_DB     COLOR_GREEN BOLD
+#define COLOR_MAIN   COLOR_MAGENTA BOLD
+#define COLOR_DB_COM COLOR_BLUE
 
 #endif

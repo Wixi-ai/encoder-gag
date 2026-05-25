@@ -19,20 +19,46 @@
 
 
 
-Клиент (curl) → POST /api/v1/records
-       ↓
-HTTP агент (секретарь) принимает запрос
-       ↓
-Генерирует UUID и создаёт сообщение msg_create_record
-       ↓
-Отправляет сообщение DB агенту через SObjectizer
-       ↓
-DB агент (начальник) получает сообщение
-       ↓
-Сохраняет данные в SQLite3 (файл records.db)
-       ↓
-HTTP агент возвращает ответ клиенту: {"status": "created", "id": "..."}
+новая структура
+encoder_project/
+├── include/                          # Заголовочные файлы (.hpp)
+│   ├── colors.hpp                    # Цвета для консоли
+│   ├── utils.hpp                     # current_time(), generate_uuid()
+│   ├── database.hpp                  # Объявление класса Database
+│   ├── messages.hpp                  # Все структуры сообщений
+│   └── agents/
+│       ├── db_agent.hpp              # Объявление DB-агента
+│       └── http_agent.hpp            # Объявление HTTP-агента
+│
+├── src/                              # Реализация (.cpp)
+│   ├── main.cpp                      # Точка входа, запуск агентов
+│   ├── database.cpp                  # Реализация Database (SQLite3)
+│   └── agents/
+│       ├── db_agent.cpp              # Реализация DB-агента
+│       └── http_agent.cpp            # Реализация HTTP-агента
+│
+├── CMakeLists.txt                    # Сборка
+├── conanfile.txt                     # Зависимости
+├── logs.sh                           # Скрипт сборки и запуска
+└── README.md                         # Документация
 
 
 
-HTTP агент → отправляет msg_get_records → DB агент → читает БД → возвращает данные → HTTP агент → отдаёт JSON
+схема работы
+POST /api/v1/records
+    ↓
+HTTP-агент → генерирует UUID → отправляет msg_create_record
+    ↓
+DB-агент → сохраняет в SQLite3
+    ↓
+HTTP-агент → возвращает {"status":"created","id":"..."}
+
+GET /api/v1/records
+    ↓
+HTTP-агент → создаёт promise → отправляет msg_get_records
+    ↓
+DB-агент → читает БД → отправляет msg_get_records_response
+    ↓
+HTTP-агент → ждёт ответ (future.wait_for) → превращает в JSON
+    ↓
+HTTP-агент → возвращает [{"id":"...","file_path":"..."}]

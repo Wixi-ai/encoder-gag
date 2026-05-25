@@ -20,20 +20,20 @@ find_package(nlohmann_json REQUIRED)
 find_package(sobjectizer REQUIRED)
 find_package(SQLite3 REQUIRED)
 
-add_executable(${PROJECT_NAME}
-    src/main.cpp
-)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+add_executable(${PROJECT_NAME} 
+    src/main.cpp
+    src/database.cpp
+    src/agents/db_agent.cpp
+    src/agents/http_agent.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
     httplib::httplib
     nlohmann_json::nlohmann_json
     sobjectizer::StaticLib
-    SQLite3::SQLite3
+    SQLite::SQLite3
 )
 
 if(WIN32)
