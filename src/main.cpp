@@ -19,8 +19,6 @@ int main() {
             coop.make_agent<http_agent_t>(db_mbox);
         });
         
-        so_5::send<msg_hello>(db_mbox, msg_hello{"main"});
-        so_5::send<msg_bye>(db_mbox, msg_bye{"main"});
         
         std::cout << COLOR_MAIN << "========================================" << COLOR_RESET << std::endl;
         std::cout << COLOR_MAIN << "  Server ready. Press Ctrl+C to exit" << COLOR_RESET << std::endl;

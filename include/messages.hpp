@@ -37,13 +37,7 @@ struct RecordCreateRequest {
     std::vector<AudioStream> audio_streams;
 };
 
-struct msg_hello {
-    std::string name;
-};
 
-struct msg_bye {
-    std::string name;
-};
 
 struct msg_create_record {
     std::string id;

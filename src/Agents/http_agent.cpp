@@ -160,22 +160,20 @@ void http_agent_t::printServerReady()
   +-----------------------------------------------------------+
 )" << COLOR_RESET;
 
-    std::cout << COLOR_YELLOW << R"(
-  |  TEST COMMANDS (run in another terminal):                |
-)" << COLOR_RESET;
-
-    std::cout << COLOR_CYAN << R"(
-  |    # Health check                                        |
-  |    curl --noproxy "localhost" http://localhost:8080/health
-  |                                                          |
-  |    # Create record                                       |
-  |    curl --noproxy "localhost" -X POST http://localhost:8080/api/v1/records \
-  |         -H "Content-Type: application/json" \
-  |         -d '{"test":"data"}'
-  |                                                          |
-  |    # Get all records                                     |
-  |    curl --noproxy "localhost" http://localhost:8080/api/v1/records
-  +-----------------------------------------------------------+
+    std::cout << COLOR_MAIN << R"(
+  +------------------------------------------------------------------------------+
+  |  TEST COMMANDS (run in another terminal):                                    |
+  |    # Health check                                                            |
+  |    curl --noproxy "localhost" http://localhost:8080/health                   |
+  |                                                                              |
+  |    # Create record                                                           |
+  |    curl --noproxy "localhost" -X POST http://localhost:8080/api/v1/records \ |
+  |         -H "Content-Type: application/json" \                                |
+  |         -d '{"test":"data"}'                                                 |
+  |                                                                              |
+  |    # Get all records                                                         |
+  |    curl --noproxy "localhost" http://localhost:8080/api/v1/records           |
+  +------------------------------------------------------------------------------+
 )" << COLOR_RESET
               << std::endl;
 }
