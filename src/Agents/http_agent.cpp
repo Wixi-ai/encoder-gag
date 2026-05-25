@@ -99,11 +99,11 @@ void http_agent_t::printBanner()
 {
     std::cout << COLOR_MAIN << R"(
   ================================================================
-  ||                         ENCODERS_GAG v1.0                 ||
-  ||                  Server for Rigel Archive Module          ||
-  ||                                                           ||
-  ||                  HTTP: localhost:8080                     ||
-  ||                  API:  /api/v1/records                    ||
+  ||                         ENCODERS_GAG v1.0                  ||
+  ||                  Server for Rigel Archive Module           ||
+  ||                                                            ||
+  ||                  HTTP: localhost:8080                      ||
+  ||                  API:  /api/v1/records                     ||
   ================================================================
 )" << COLOR_RESET
               << std::endl;
