@@ -88,15 +88,20 @@ curl --noproxy "localhost" http://localhost:8080/api/v1/records
 
 ```
 encoder_project/
-├── src/
-│   ├── main.cpp
-│   ├── colors.hpp
-│   ├── database.hpp
-│   ├── utils.hpp
-│   └── agents/
-│       ├── db_agent.hpp
-│       └── http_agent.hpp
-├── messages.hpp
+├── include/ # Заголовочные файлы
+│ ├── colors.hpp # Цвета для консоли
+│ ├── utils.hpp # Утилиты (UUID, время)
+│ ├── database.hpp # Работа с SQLite3
+│ ├── messages.hpp # Сообщения между агентами
+│ └── agents/
+│ ├── db_agent.hpp # DB агент (интерфейс)
+│ └── http_agent.hpp # HTTP агент (интерфейс)
+├── src/ # Реализация
+│ ├── main.cpp # Точка входа
+│ ├── database.cpp # Реализация SQLite3
+│ └── agents/
+│ ├── db_agent.cpp # Реализация DB агента
+│ └── http_agent.cpp # Реализация HTTP агента
 ├── CMakeLists.txt
 ├── conanfile.txt
 ├── logs.sh
