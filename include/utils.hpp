@@ -39,3 +39,18 @@ inline std::string generate_uuid() {
     }
     return ss.str();
 }
+
+inline bool is_valid_uuid(const std::string& uuid) {
+    if (uuid.length() != 36) return false;
+    for (size_t i = 0; i < uuid.length(); i++) {
+        char c = uuid[i];
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (c != '-') return false;
+        } else {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
