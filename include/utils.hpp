@@ -7,6 +7,9 @@
 #include <sstream>
 #include <random>
 
+/**
+ * @brief Возвращает текущее время в формате ЧЧ:ММ:СС.мсс
+ */
 inline std::string current_time() {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -20,6 +23,9 @@ inline std::string current_time() {
     return ss.str();
 }
 
+/**
+ * @brief Генерирует UUID v4
+ */
 inline std::string generate_uuid() {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -28,21 +34,20 @@ inline std::string generate_uuid() {
 
     std::stringstream ss;
     ss << std::hex << std::setfill('0');
-    for (int i = 0; i < 36; i++) {
-        if (i == 8 || i == 13 || i == 18 || i == 23) {
-            ss << '-';
-        } else if (i == 14) {
-            ss << dis2(gen);
-        } else {
-            ss << dis(gen);
-        }
+    for (int i = 0; i < 36; ++i) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) ss << '-';
+        else if (i == 14) ss << dis2(gen);
+        else ss << dis(gen);
     }
     return ss.str();
 }
 
+/**
+ * @brief Проверяет, является ли строка валидным UUID
+ */
 inline bool is_valid_uuid(const std::string& uuid) {
     if (uuid.length() != 36) return false;
-    for (size_t i = 0; i < uuid.length(); i++) {
+    for (size_t i = 0; i < uuid.length(); ++i) {
         char c = uuid[i];
         if (i == 8 || i == 13 || i == 18 || i == 23) {
             if (c != '-') return false;

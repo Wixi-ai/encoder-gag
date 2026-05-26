@@ -45,6 +45,8 @@ cd encoders_gag
 |-------|----------|----------|
 | POST | `/api/v1/records` | Создание новой записи |
 | GET | `/api/v1/records` | Получение списка записей |
+| GET | `/api/v1/records/{id}` | Получение списка записей |
+| DELETE | `/api/v1/records/{id}` | Получение списка записей |
 | GET | `/health` | Проверка состояния сервера |
 
 ## 🚀 Быстрые скрипты для тестирования
@@ -55,11 +57,17 @@ cd encoders_gag
 # Проверка здоровья сервера
 ./scripts/health.sh
 
-# Создание новой записи
-./scripts/create.sh
+# Создание новой записи (укажите UUID)
+./scripts/create.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 # Получение всех записей
 ./scripts/get.sh
+
+# Получение записи по ID
+./scripts/get_by_id.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+# Удаление записи по ID
+./scripts/delete.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 ```
 
 ## 🧪 Проверка работы сервера
@@ -68,44 +76,47 @@ cd encoders_gag
 
 ### 1. Проверка здоровья
 ```bash
+# Проверка здоровья
 curl --noproxy "localhost" http://localhost:8080/health
-```
-**Ожидаемый ответ:** `OK`
 
-### 2. Создание записи
-```bash
-curl --noproxy "localhost" -X POST http://localhost:8080/api/v1/records -H "Content-Type: application/json" -d '{"test":"data"}'
-```
-**Ожидаемый ответ:** `{"status":"created","id":"..."}`
+# Создание записи с UUID
+curl --noproxy "localhost" -X POST http://localhost:8080/api/v1/records \
+  -H "Content-Type: application/json" \
+  -d '{"id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","block_size":10,"fblock":"test","streams":[]}'
 
-### 3. Получение всех записей
-```bash
+# Получение всех записей
 curl --noproxy "localhost" http://localhost:8080/api/v1/records
-```
-**Ожидаемый ответ:** JSON-массив с записями
+
+# Получение записи по ID
+curl --noproxy "localhost" http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+
+# Удаление записи по ID
+curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
 
 ## 📁 Структура проекта
 
 ```
 encoder_project/
-├── include/ # Заголовочные файлы
-│ ├── colors.hpp # Цвета для консоли
-│ ├── utils.hpp # Утилиты (UUID, время)
-│ ├── database.hpp # Работа с SQLite3 (объявление)
-│ ├── messages.hpp # Сообщения между агентами
-│ └── agents/
-│ ├── db_agent.hpp # DB агент (объявление)
-│ └── http_agent.hpp # HTTP агент (объявление)
-├── src/ # Реализация
-│ ├── main.cpp # Точка входа
-│ ├── database.cpp # Реализация SQLite3
-│ └── agents/
-│ ├── db_agent.cpp # Реализация DB агента
-│ └── http_agent.cpp # Реализация HTTP агента
-├── scripts/ # Скрипты для тестирования
-│ ├── health.sh
-│ ├── create.sh
-│ └── get.sh
+├── include/                     # Заголовочные файлы
+│   ├── colors.hpp               # Цвета для консоли
+│   ├── utils.hpp                # Утилиты (UUID, время, валидация)
+│   ├── database.hpp             # Работа с SQLite3 (объявление)
+│   ├── messages.hpp             # Сообщения между агентами
+│   └── agents/
+│       ├── db_agent.hpp         # DB агент (объявление)
+│       └── http_agent.hpp       # HTTP агент (объявление)
+├── src/                         # Реализация
+│   ├── main.cpp                 # Точка входа
+│   ├── database.cpp             # Реализация SQLite3
+│   └── agents/
+│       ├── db_agent.cpp         # Реализация DB агента
+│       └── http_agent.cpp       # Реализация HTTP агента
+├── scripts/                     # Скрипты для тестирования
+│   ├── health.sh
+│   ├── create.sh
+│   ├── get.sh
+│   ├── get_by_id.sh
+│   └── delete.sh
 ├── CMakeLists.txt
 ├── conanfile.txt
 ├── start.sh
@@ -132,23 +143,17 @@ encoder_project/
 - [x] GET /api/v1/records (реальные данные из БД)
 - [x] SQLite3 сохранение
 - [x] Цветной вывод
-- [ ] GET /api/v1/records/{id}
-- [ ] DELETE /api/v1/records/{id}
+- [x] GET /api/v1/records/{id}
+- [x] DELETE /api/v1/records/{id}
 - [ ] ffmpeg_pool актор
 
 ## 📝 Примечание
 
-Флаг `--noproxy "localhost"` необходим при работе через корпоративный прокси.
+Флаг --noproxy "localhost" необходим при работе через корпоративный прокси
+
+ID записи должен быть в формате UUID (например, aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)
 
 ## 📝 Лицензия
 
 © 2026 Rigel. Все права защищены.
-```
-
-Сохрани и закоммить:
-
-```bash
-git add README.md
-git commit -m "fix: restore README"
-git push gitlab feature/init
 ```
