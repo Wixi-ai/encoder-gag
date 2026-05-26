@@ -1,14 +1,13 @@
 #include "../../include/agents/db_agent.hpp"
 
-db_agent_t::db_agent_t(context_t ctx)
+db_agent_t::db_agent_t(context_t ctx, const std::string& db_path)
     : so_5::agent_t{std::move(ctx)}
-    , m_db("records.db")
+    , m_db(db_path)
     , m_create_counter(0)
     , m_total_saved(0)
 {}
 
 void db_agent_t::so_define_agent() {
-    // POST: создание записи
     so_subscribe_self().event([this](const msg_create_record& msg) {
         m_create_counter++;
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] CREATE #" << m_create_counter << COLOR_RESET << std::endl;
@@ -32,7 +31,6 @@ void db_agent_t::so_define_agent() {
         }
     });
 
-    // GET ALL: получение всех записей
     so_subscribe_self().event([this](const msg_get_records& msg) {
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET ALL RECORDS #" << msg.request_id << COLOR_RESET << std::endl;
 
@@ -45,7 +43,6 @@ void db_agent_t::so_define_agent() {
         so_5::send<msg_get_records_response>(msg.reply_to, response);
     });
     
-    // GET BY ID: получение одной записи
     so_subscribe_self().event([this](const msg_get_record_by_id& msg) {
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORD BY ID #" << msg.request_id << " id=" << msg.id << COLOR_RESET << std::endl;
 
@@ -66,7 +63,6 @@ void db_agent_t::so_define_agent() {
         }
     });
     
-    // DELETE: удаление записи
     so_subscribe_self().event([this](const msg_delete_record_by_id& msg) {
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] DELETE RECORD #" << msg.request_id << " id=" << msg.id << COLOR_RESET << std::endl;
 
