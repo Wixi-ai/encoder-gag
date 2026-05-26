@@ -14,7 +14,6 @@ so_5::environment_t* g_env = nullptr;
 
 void signal_handler(int signal) {
     LOG_INFO("MAIN", "Received signal " + std::to_string(signal) + ", shutting down...");
-    std::cout << COLOR_YELLOW << "\n  Shutting down gracefully..." << COLOR_RESET << std::endl;
     g_running = false;
     if (g_env) {
         g_env->stop();
@@ -27,7 +26,6 @@ std::string get_env(const std::string& key, const std::string& default_value) {
 }
 
 int main() {
-    // Регистрируем обработчик сигналов
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     
@@ -58,19 +56,11 @@ int main() {
             coop.make_agent<http_agent_t>(db_mbox, host, port);
         });
 
-        LOG_INFO("MAIN", "Agents created successfully");
-        
-        std::cout << COLOR_MAIN << "========================================" << COLOR_RESET << std::endl;
-        std::cout << COLOR_MAIN << "  Server ready. Press Ctrl+C to exit" << COLOR_RESET << std::endl;
-        std::cout << COLOR_MAIN << "========================================" << COLOR_RESET << std::endl;
-
-        // Ждём сигнала завершения
         while (g_running) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     });
     
     LOG_INFO("MAIN", "Server stopped gracefully");
-    std::cout << COLOR_GREEN << "  Server stopped successfully." << COLOR_RESET << std::endl;
     return 0;
 }
