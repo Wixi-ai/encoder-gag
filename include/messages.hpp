@@ -40,3 +40,15 @@ struct msg_get_record_by_id_response {
     std::string file_path;
     std::string created_at;
 };
+
+struct msg_delete_record_by_id {
+    std::string id;
+    int request_id;
+    so_5::mbox_t reply_to;
+};
+
+struct msg_delete_record_by_id_response {
+    int request_id;
+    bool success;
+    std::string error_message;
+};

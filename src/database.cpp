@@ -101,3 +101,32 @@ std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(
     sqlite3_finalize(stmt);
     return {false, "", "", ""};
 }
+
+bool Database::deleteRecordById(const std::string& id) {
+    const char* sql = "DELETE FROM records WHERE id = ?;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << COLOR_DB_COM << "[Database] Delete prepare error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        return false;
+    }
+    
+    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
+    
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc == SQLITE_DONE) {
+        int changes = sqlite3_changes(db);
+        if (changes > 0) {
+            std::cout << COLOR_DB_COM << "[Database] Record deleted: " << id << COLOR_RESET << std::endl;
+            return true;
+        } else {
+            std::cout << COLOR_DB_COM << "[Database] Record not found: " << id << COLOR_RESET << std::endl;
+            return false;
+        }
+    }
+    
+    std::cerr << COLOR_DB_COM << "[Database] Delete error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+    return false;
+}

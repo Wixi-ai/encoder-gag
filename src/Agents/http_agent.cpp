@@ -40,35 +40,37 @@ void http_agent_t::so_evt_start()
             m_pending_record_requests.erase(it);
         }
     });
+    
+    so_subscribe_self().event([this](const msg_delete_record_by_id_response& response) {
+        auto it = m_pending_delete_requests.find(response.request_id);
+        if (it != m_pending_delete_requests.end()) {
+            it->second->set_value(response);
+            std::lock_guard<std::mutex> lock(m_pending_delete_mutex);
+            m_pending_delete_requests.erase(it);
+        }
+    });
 
     m_server = std::make_unique<httplib::Server>();
 
-    m_server->Post("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res)
-                   {
+    m_server->Post("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res) {
         m_request_counter++;
         std::string uuid = generate_uuid();
-
         printRequest("POST", "/api/v1/records", m_request_counter, uuid.substr(0, 8), req.body);
 
         auto promise = std::make_shared<std::promise<bool>>();
         auto future = promise->get_future();
-
-        {
-            std::lock_guard<std::mutex> lock(m_creates_mutex);
-            m_pending_creates[uuid] = promise;
-        }
+        { std::lock_guard<std::mutex> lock(m_creates_mutex); m_pending_creates[uuid] = promise; }
 
         msg_create_record msg;
         msg.id = uuid;
         msg.file_path = "C:/test/video.mp4";
         msg.request_body = req.body;
         msg.reply_to = so_direct_mbox();
-
         so_5::send<msg_create_record>(m_db_mbox, msg);
+        
         std::cout << COLOR_HTTP << "  -> DB Agent | sent, waiting for response" << COLOR_RESET << std::endl;
-
-        auto status = future.wait_for(std::chrono::seconds(5));
-        if (status == std::future_status::ready && future.get()) {
+        
+        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::ready && future.get()) {
             std::string response = "{\"status\": \"created\", \"id\": \"" + uuid + "\"}";
             res.set_content(response, "application/json");
             res.status = 201;
@@ -78,27 +80,20 @@ void http_agent_t::so_evt_start()
             res.set_content("{\"error\": \"failed to save record\"}", "application/json");
             res.status = 500;
             printResponse(500, "{\"error\": \"failed to save record\"}");
-        } });
+        }
+    });
 
-    m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &req, httplib::Response &res)
-                  {
+    m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &, httplib::Response &res) {
         int request_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records", request_id, "", "");
 
         auto promise = std::make_shared<std::promise<msg_get_records_response>>();
         auto future = promise->get_future();
-
-        {
-            std::lock_guard<std::mutex> lock(m_pending_mutex);
-            m_pending_requests[request_id] = promise;
-        }
-
-        std::cout << COLOR_HTTP << "  -> DB Agent | request #" << request_id << COLOR_RESET << std::endl;
+        { std::lock_guard<std::mutex> lock(m_pending_mutex); m_pending_requests[request_id] = promise; }
 
         so_5::send<msg_get_records>(m_db_mbox, request_id, so_direct_mbox());
-
-        auto status = future.wait_for(std::chrono::seconds(5));
-        if (status == std::future_status::ready) {
+        
+        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
             auto response = future.get();
             json j = json::array();
             for (const auto& rec : response.records) {
@@ -106,47 +101,30 @@ void http_agent_t::so_evt_start()
             }
             res.set_content(j.dump(), "application/json");
             res.status = 200;
-
-            std::cout << COLOR_HTTP << "  <- DB Agent | response with " << response.records.size() << " records" << COLOR_RESET << std::endl;
-            printResponse(200, j.dump().substr(0, 80) + (j.dump().size() > 80 ? "..." : ""));
+            printResponse(200, j.dump().substr(0, 60) + (j.dump().size() > 60 ? "..." : ""));
         } else {
-            std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
-        } });
+            printResponse(504, "{\"error\": \"timeout\"}");
+        }
+    });
     
-    m_server->Get(R"(/api/v1/records/(\w+-\w+-\w+-\w+-\w+))", [this](const httplib::Request &req, httplib::Response &res)
-                  {
+    m_server->Get(R"(/api/v1/records/(\w+-\w+-\w+-\w+-\w+))", [this](const httplib::Request &req, httplib::Response &res) {
         std::string id = req.matches[1];
         int request_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records/" + id, request_id, id.substr(0, 8), "");
 
         auto promise = std::make_shared<std::promise<msg_get_record_by_id_response>>();
         auto future = promise->get_future();
+        { std::lock_guard<std::mutex> lock(m_pending_record_mutex); m_pending_record_requests[request_id] = promise; }
 
-        {
-            std::lock_guard<std::mutex> lock(m_pending_record_mutex);
-            m_pending_record_requests[request_id] = promise;
-        }
-
-        std::cout << COLOR_HTTP << "  -> DB Agent | request #" << request_id << " for id=" << id.substr(0, 8) << COLOR_RESET << std::endl;
-
-        msg_get_record_by_id msg;
-        msg.id = id;
-        msg.request_id = request_id;
-        msg.reply_to = so_direct_mbox();
-        
+        msg_get_record_by_id msg = {id, request_id, so_direct_mbox()};
         so_5::send<msg_get_record_by_id>(m_db_mbox, msg);
 
-        auto status = future.wait_for(std::chrono::seconds(5));
-        if (status == std::future_status::ready) {
+        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
             auto response = future.get();
             if (response.found) {
-                json j = {
-                    {"id", response.id},
-                    {"file_path", response.file_path},
-                    {"created_at", response.created_at}
-                };
+                json j = {{"id", response.id}, {"file_path", response.file_path}, {"created_at", response.created_at}};
                 res.set_content(j.dump(), "application/json");
                 res.status = 200;
                 printResponse(200, j.dump());
@@ -156,30 +134,54 @@ void http_agent_t::so_evt_start()
                 printResponse(404, "{\"error\": \"record not found\"}");
             }
         } else {
-            std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
-        } });
+            printResponse(504, "{\"error\": \"timeout\"}");
+        }
+    });
+    
+    m_server->Delete(R"(/api/v1/records/(\w+-\w+-\w+-\w+-\w+))", [this](const httplib::Request &req, httplib::Response &res) {
+        std::string id = req.matches[1];
+        int request_id = ++m_request_id_counter;
+        printRequest("DELETE", "/api/v1/records/" + id, request_id, id.substr(0, 8), "");
 
-    m_server->Get("/health", [](const httplib::Request &, httplib::Response &res)
-                  {
+        auto promise = std::make_shared<std::promise<msg_delete_record_by_id_response>>();
+        auto future = promise->get_future();
+        { std::lock_guard<std::mutex> lock(m_pending_delete_mutex); m_pending_delete_requests[request_id] = promise; }
+
+        msg_delete_record_by_id msg = {id, request_id, so_direct_mbox()};
+        so_5::send<msg_delete_record_by_id>(m_db_mbox, msg);
+
+        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
+            auto response = future.get();
+            if (response.success) {
+                res.set_content("{\"status\": \"deleted\", \"id\": \"" + id + "\"}", "application/json");
+                res.status = 200;
+                printResponse(200, "{\"status\": \"deleted\"}");
+            } else {
+                res.set_content("{\"error\": \"record not found\"}", "application/json");
+                res.status = 404;
+                printResponse(404, "{\"error\": \"record not found\"}");
+            }
+        } else {
+            res.set_content("{\"error\": \"timeout\"}", "application/json");
+            res.status = 504;
+            printResponse(504, "{\"error\": \"timeout\"}");
+        }
+    });
+
+    m_server->Get("/health", [](const httplib::Request &, httplib::Response &res) {
         res.set_content("OK", "text/plain");
-        res.status = 200; });
+        res.status = 200;
+    });
 
-    m_server_thread = std::thread([this]()
-                                  { m_server->listen("localhost", 8080); });
+    m_server_thread = std::thread([this]() { m_server->listen("localhost", 8080); });
 }
 
 void http_agent_t::so_evt_finish()
 {
-    if (m_server)
-    {
-        m_server->stop();
-    }
-    if (m_server_thread.joinable())
-    {
-        m_server_thread.join();
-    }
+    if (m_server) { m_server->stop(); }
+    if (m_server_thread.joinable()) { m_server_thread.join(); }
 }
 
 void http_agent_t::printStartupInfo()
@@ -204,6 +206,7 @@ void http_agent_t::printStartupInfo()
   |    POST   /api/v1/records         - Create new record     |
   |    GET    /api/v1/records         - Get all records       |
   |    GET    /api/v1/records/{id}    - Get record by ID      |
+  |    DELETE /api/v1/records/{id}    - Delete record by ID   |
   |    GET    /health                 - Health check          |
   +-----------------------------------------------------------+
 )" << COLOR_RESET;
@@ -221,8 +224,11 @@ void http_agent_t::printStartupInfo()
   |    # Get all records                                                         |
   |    ./scripts/get.sh                                                          |
   |                                                                              |
-  |    # Get record by ID (replace {id} with actual UUID)                        |
-  |    ./scripts/get_by_id.sh {id}                                               |
+  |    # Get record by ID                                                        |
+  |    ./scripts/get_by_id.sh <uuid>                                             |
+  |                                                                              |
+  |    # Delete record by ID                                                     |
+  |    ./scripts/delete.sh <uuid>                                                |
   |                                                                              |
   +------------------------------------------------------------------------------+
 )" << COLOR_RESET << std::endl;
@@ -233,23 +239,19 @@ void http_agent_t::printRequest(const std::string &method, const std::string &pa
     std::cout << COLOR_HTTP << "\n  +-----------------------------------------------------------+\n"
               << "  | " << std::left << std::setw(55) << (method + " #" + std::to_string(num) + " | " + path) << " |\n"
               << "  +-----------------------------------------------------------+\n";
-    if (!id.empty())
-    {
+    if (!id.empty()) {
         std::cout << "  | ID:   " << std::left << std::setw(52) << id << " |\n";
     }
-    if (!body.empty())
-    {
+    if (!body.empty()) {
         std::string short_body = body.size() > 45 ? body.substr(0, 42) + "..." : body;
         std::cout << "  | Body: " << std::left << std::setw(51) << short_body << " |\n";
     }
-    std::cout << "  +-----------------------------------------------------------+\n"
-              << COLOR_RESET;
+    std::cout << "  +-----------------------------------------------------------+\n" << COLOR_RESET;
 }
 
 void http_agent_t::printResponse(int status, const std::string &body)
 {
     std::string color = (status >= 200 && status < 300) ? COLOR_GREEN : COLOR_RED;
     std::cout << color << "  <- Response | Status: " << status << "\n"
-              << "  <- Body     | " << (body.size() > 55 ? body.substr(0, 52) + "..." : body) << "\n"
-              << COLOR_RESET;
+              << "  <- Body     | " << (body.size() > 55 ? body.substr(0, 52) + "..." : body) << "\n" << COLOR_RESET;
 }

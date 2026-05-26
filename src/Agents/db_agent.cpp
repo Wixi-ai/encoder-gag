@@ -8,6 +8,7 @@ db_agent_t::db_agent_t(context_t ctx)
 {}
 
 void db_agent_t::so_define_agent() {
+    // POST
     so_subscribe_self().event([this](const msg_create_record& msg) {
         m_create_counter++;
 
@@ -33,6 +34,7 @@ void db_agent_t::so_define_agent() {
         }
     });
 
+    // GET ALL
     so_subscribe_self().event([this](const msg_get_records& msg) {
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET ALL RECORDS #" << msg.request_id << COLOR_RESET << std::endl;
 
@@ -46,7 +48,7 @@ void db_agent_t::so_define_agent() {
         so_5::send<msg_get_records_response>(msg.reply_to, response);
     });
     
-    // НОВЫЙ ОБРАБОТЧИК: GET /records/{id}
+    // GET BY ID
     so_subscribe_self().event([this](const msg_get_record_by_id& msg) {
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORD BY ID #" << msg.request_id << " id=" << msg.id << COLOR_RESET << std::endl;
 
@@ -65,6 +67,26 @@ void db_agent_t::so_define_agent() {
             std::cout << COLOR_DB << "  found: " << id << COLOR_RESET << std::endl;
         } else {
             std::cout << COLOR_DB << "  not found" << COLOR_RESET << std::endl;
+        }
+    });
+    
+    // DELETE BY ID
+    so_subscribe_self().event([this](const msg_delete_record_by_id& msg) {
+        std::cout << COLOR_DB << "[" << current_time() << "] [DB] DELETE RECORD #" << msg.request_id << " id=" << msg.id << COLOR_RESET << std::endl;
+
+        bool success = m_db.deleteRecordById(msg.id);
+        
+        msg_delete_record_by_id_response response;
+        response.request_id = msg.request_id;
+        response.success = success;
+        response.error_message = success ? "" : "Record not found or delete failed";
+        
+        so_5::send<msg_delete_record_by_id_response>(msg.reply_to, response);
+        
+        if (success) {
+            std::cout << COLOR_DB << "  deleted" << COLOR_RESET << std::endl;
+        } else {
+            std::cout << COLOR_DB << "  delete failed (not found)" << COLOR_RESET << std::endl;
         }
     });
 }

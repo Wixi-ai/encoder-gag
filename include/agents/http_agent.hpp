@@ -43,4 +43,8 @@ private:
     // Для POST
     std::unordered_map<std::string, std::shared_ptr<std::promise<bool>>> m_pending_creates;
     std::mutex m_creates_mutex;
+    
+    // Для DELETE
+    std::unordered_map<int, std::shared_ptr<std::promise<msg_delete_record_by_id_response>>> m_pending_delete_requests;
+    std::mutex m_pending_delete_mutex;
 };
