@@ -1,59 +1,56 @@
 /**
  * @file http_agent.cpp
  * @brief HTTP серверный агент - обрабатывает входящие REST запросы
- * 
- * Отвечает за:
- * - Запуск HTTP сервера на порту 8080
- * - Приём и валидацию запросов
- * - Отправку сообщений DB агенту
- * - Формирование HTTP ответов
  */
 
 #include "../../include/agents/http_agent.hpp"
 #include "../../include/colors.hpp"
 #include "../../include/utils.hpp"
+#include "../../include/logger.hpp"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-
-// ============================================================================
-// ВАЛИДАЦИЯ ВХОДНЫХ ДАННЫХ
-// ============================================================================
 
 static bool validatePostRequest(const json& j, httplib::Response& res) {
     if (!j.contains("id") || !j["id"].is_string()) {
         res.set_content("{\"error\": \"missing or invalid 'id' field\"}", "application/json");
         res.status = 400;
+        LOG_WARN("HTTP", "Validation failed: missing id field");
         return false;
     }
     
     if (!is_valid_uuid(j["id"].get<std::string>())) {
         res.set_content("{\"error\": \"invalid uuid format\"}", "application/json");
         res.status = 400;
+        LOG_WARN("HTTP", "Validation failed: invalid UUID format");
         return false;
     }
     
     if (!j.contains("block_size") || !j["block_size"].is_number_integer()) {
         res.set_content("{\"error\": \"missing or invalid 'block_size' field\"}", "application/json");
         res.status = 400;
+        LOG_WARN("HTTP", "Validation failed: missing block_size");
         return false;
     }
     
     if (j["block_size"].get<int>() <= 0) {
         res.set_content("{\"error\": \"block_size must be positive integer\"}", "application/json");
         res.status = 400;
+        LOG_WARN("HTTP", "Validation failed: block_size <= 0");
         return false;
     }
     
     if (!j.contains("fblock") || !j["fblock"].is_string()) {
         res.set_content("{\"error\": \"missing or invalid 'fblock' field\"}", "application/json");
         res.status = 400;
+        LOG_WARN("HTTP", "Validation failed: missing fblock");
         return false;
     }
     
     if (!j.contains("streams") || !j["streams"].is_array()) {
         res.set_content("{\"error\": \"missing or invalid 'streams' field (must be array)\"}", "application/json");
         res.status = 400;
+        LOG_WARN("HTTP", "Validation failed: missing streams");
         return false;
     }
     
@@ -61,37 +58,40 @@ static bool validatePostRequest(const json& j, httplib::Response& res) {
         if (!stream.contains("id") || !stream["id"].is_number_integer()) {
             res.set_content("{\"error\": \"each stream must have integer 'id' field\"}", "application/json");
             res.status = 400;
+            LOG_WARN("HTTP", "Validation failed: stream missing integer id");
             return false;
         }
         if (!stream.contains("codec") || !stream["codec"].is_string()) {
             res.set_content("{\"error\": \"each stream must have string 'codec' field\"}", "application/json");
             res.status = 400;
+            LOG_WARN("HTTP", "Validation failed: stream missing codec");
             return false;
         }
         if (stream.contains("width") && !stream["width"].is_number_integer()) {
             res.set_content("{\"error\": \"width must be integer\"}", "application/json");
             res.status = 400;
+            LOG_WARN("HTTP", "Validation failed: width not integer");
             return false;
         }
         if (stream.contains("height") && !stream["height"].is_number_integer()) {
             res.set_content("{\"error\": \"height must be integer\"}", "application/json");
             res.status = 400;
+            LOG_WARN("HTTP", "Validation failed: height not integer");
             return false;
         }
     }
     return true;
 }
 
-// ============================================================================
-// КОНСТРУКТОР И ЗАПУСК
-// ============================================================================
-
 http_agent_t::http_agent_t(context_t ctx, so_5::mbox_t db_mbox)
     : so_5::agent_t{std::move(ctx)}, m_db_mbox{std::move(db_mbox)}, m_request_counter(0), m_request_id_counter(0)
-{}
+{
+    LOG_INFO("HTTP", "HTTP Agent created");
+}
 
 void http_agent_t::so_evt_start() {
     printStartupInfo();
+    LOG_INFO("HTTP", "Starting HTTP server on port 8080");
 
     so_subscribe_self().event([this](const msg_create_response& response) {
         auto it = m_pending_creates.find(response.id);
@@ -99,6 +99,7 @@ void http_agent_t::so_evt_start() {
             it->second->set_value(response.success);
             std::lock_guard<std::mutex> lock(m_creates_mutex);
             m_pending_creates.erase(it);
+            LOG_DEBUG("HTTP", "Received create response for id: " + response.id);
         }
     });
 
@@ -108,6 +109,7 @@ void http_agent_t::so_evt_start() {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_mutex);
             m_pending_requests.erase(it);
+            LOG_DEBUG("HTTP", "Received records response with " + std::to_string(response.records.size()) + " records");
         }
     });
     
@@ -117,6 +119,7 @@ void http_agent_t::so_evt_start() {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_record_mutex);
             m_pending_record_requests.erase(it);
+            LOG_DEBUG("HTTP", "Received record by id response, found: " + std::to_string(response.found));
         }
     });
     
@@ -126,19 +129,19 @@ void http_agent_t::so_evt_start() {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_delete_mutex);
             m_pending_delete_requests.erase(it);
+            LOG_DEBUG("HTTP", "Received delete response, success: " + std::to_string(response.success));
         }
     });
 
     m_server = std::make_unique<httplib::Server>();
 
-    // ========================================================================
-    // POST /api/v1/records - создание записи
-    // ========================================================================
+    // POST /api/v1/records
     m_server->Post("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res) {
         if (req.body.empty()) {
             res.set_content("{\"error\": \"empty request body\"}", "application/json");
             res.status = 400;
             printResponse(400, "{\"error\": \"empty request body\"}");
+            LOG_WARN("HTTP", "Empty request body from " + req.remote_addr);
             return;
         }
         
@@ -152,6 +155,7 @@ void http_agent_t::so_evt_start() {
             std::string id = j["id"].get<std::string>();
             m_request_counter++;
             printRequest("POST", "/api/v1/records", m_request_counter, id.substr(0, 8), req.body);
+            LOG_INFO("HTTP", "POST request #" + std::to_string(m_request_counter) + " id=" + id);
 
             auto promise = std::make_shared<std::promise<bool>>();
             auto future = promise->get_future();
@@ -171,6 +175,7 @@ void http_agent_t::so_evt_start() {
                 res.set_content("{\"error\": \"timeout\"}", "application/json");
                 res.status = 504;
                 printResponse(504, "{\"error\": \"timeout\"}");
+                LOG_ERROR("HTTP", "Timeout waiting for DB response for id=" + id);
                 return;
             }
             
@@ -179,24 +184,26 @@ void http_agent_t::so_evt_start() {
                 res.set_content(response, "application/json");
                 res.status = 201;
                 printResponse(201, response);
+                LOG_INFO("HTTP", "Record created successfully: " + id);
             } else {
                 res.set_content("{\"error\": \"record already exists\"}", "application/json");
                 res.status = 409;
                 printResponse(409, "{\"error\": \"record already exists\"}");
+                LOG_WARN("HTTP", "Duplicate record attempt: " + id);
             }
         } catch (const json::parse_error& e) {
             res.set_content("{\"error\": \"invalid JSON format\"}", "application/json");
             res.status = 400;
             printResponse(400, "{\"error\": \"invalid JSON format\"}");
+            LOG_WARN("HTTP", "Invalid JSON from " + req.remote_addr);
         }
     });
 
-    // ========================================================================
-    // GET /api/v1/records - получение всех записей
-    // ========================================================================
+    // GET /api/v1/records
     m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &, httplib::Response &res) {
         int req_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records", req_id, "", "");
+        LOG_DEBUG("HTTP", "GET all records request #" + std::to_string(req_id));
 
         auto promise = std::make_shared<std::promise<msg_get_records_response>>();
         auto future = promise->get_future();
@@ -208,6 +215,7 @@ void http_agent_t::so_evt_start() {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
             printResponse(504, "{\"error\": \"timeout\"}");
+            LOG_ERROR("HTTP", "Timeout getting all records");
             return;
         }
         
@@ -219,22 +227,23 @@ void http_agent_t::so_evt_start() {
         res.set_content(j.dump(), "application/json");
         res.status = 200;
         printResponse(200, j.dump().substr(0, 60) + (j.dump().size() > 60 ? "..." : ""));
+        LOG_INFO("HTTP", "Returned " + std::to_string(response.records.size()) + " records");
     });
     
-    // ========================================================================
-    // GET /api/v1/records/{id} - получение одной записи по ID
-    // ========================================================================
+    // GET /api/v1/records/{id}
     m_server->Get(R"(/api/v1/records/([a-f0-9-]+))", [this](const httplib::Request &req, httplib::Response &res) {
         std::string id = req.matches[1];
         if (!is_valid_uuid(id)) {
             res.set_content("{\"error\": \"invalid uuid format\"}", "application/json");
             res.status = 400;
             printResponse(400, "{\"error\": \"invalid uuid format\"}");
+            LOG_WARN("HTTP", "Invalid UUID format: " + id);
             return;
         }
         
         int req_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records/" + id, req_id, id.substr(0, 8), "");
+        LOG_DEBUG("HTTP", "GET record by id: " + id);
 
         auto promise = std::make_shared<std::promise<msg_get_record_by_id_response>>();
         auto future = promise->get_future();
@@ -250,6 +259,7 @@ void http_agent_t::so_evt_start() {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
             printResponse(504, "{\"error\": \"timeout\"}");
+            LOG_ERROR("HTTP", "Timeout getting record by id: " + id);
             return;
         }
         
@@ -259,27 +269,29 @@ void http_agent_t::so_evt_start() {
             res.set_content(j.dump(), "application/json");
             res.status = 200;
             printResponse(200, j.dump());
+            LOG_INFO("HTTP", "Record found: " + id);
         } else {
             res.set_content("{\"error\": \"record not found\"}", "application/json");
             res.status = 404;
             printResponse(404, "{\"error\": \"record not found\"}");
+            LOG_WARN("HTTP", "Record not found: " + id);
         }
     });
     
-    // ========================================================================
-    // DELETE /api/v1/records/{id} - удаление записи по ID
-    // ========================================================================
+    // DELETE /api/v1/records/{id}
     m_server->Delete(R"(/api/v1/records/([a-f0-9-]+))", [this](const httplib::Request &req, httplib::Response &res) {
         std::string id = req.matches[1];
         if (!is_valid_uuid(id)) {
             res.set_content("{\"error\": \"invalid uuid format\"}", "application/json");
             res.status = 400;
             printResponse(400, "{\"error\": \"invalid uuid format\"}");
+            LOG_WARN("HTTP", "Invalid UUID format for delete: " + id);
             return;
         }
         
         int req_id = ++m_request_id_counter;
         printRequest("DELETE", "/api/v1/records/" + id, req_id, id.substr(0, 8), "");
+        LOG_DEBUG("HTTP", "DELETE record by id: " + id);
 
         auto promise = std::make_shared<std::promise<msg_delete_record_by_id_response>>();
         auto future = promise->get_future();
@@ -295,6 +307,7 @@ void http_agent_t::so_evt_start() {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
             printResponse(504, "{\"error\": \"timeout\"}");
+            LOG_ERROR("HTTP", "Timeout deleting record: " + id);
             return;
         }
         
@@ -303,10 +316,12 @@ void http_agent_t::so_evt_start() {
             res.set_content("{\"status\": \"deleted\", \"id\": \"" + id + "\"}", "application/json");
             res.status = 200;
             printResponse(200, "{\"status\": \"deleted\"}");
+            LOG_INFO("HTTP", "Record deleted: " + id);
         } else {
             res.set_content("{\"error\": \"record not found\"}", "application/json");
             res.status = 404;
             printResponse(404, "{\"error\": \"record not found\"}");
+            LOG_WARN("HTTP", "Record not found for delete: " + id);
         }
     });
 
@@ -319,13 +334,10 @@ void http_agent_t::so_evt_start() {
 }
 
 void http_agent_t::so_evt_finish() {
+    LOG_INFO("HTTP", "Shutting down HTTP server");
     if (m_server) { m_server->stop(); }
     if (m_server_thread.joinable()) { m_server_thread.join(); }
 }
-
-// ============================================================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ КРАСИВОГО ВЫВОДА
-// ============================================================================
 
 void http_agent_t::printStartupInfo() {
     std::cout << COLOR_MAIN << "\n"
