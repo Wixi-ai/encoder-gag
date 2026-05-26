@@ -32,11 +32,15 @@ private:
     int m_request_counter;
     std::atomic<int> m_request_id_counter;
     
-    // Для GET запросов
+    // Для GET /records (все записи)
     std::unordered_map<int, std::shared_ptr<std::promise<msg_get_records_response>>> m_pending_requests;
     std::mutex m_pending_mutex;
     
-    // Для POST запросов
+    // Для GET /records/{id} (одна запись)
+    std::unordered_map<int, std::shared_ptr<std::promise<msg_get_record_by_id_response>>> m_pending_record_requests;
+    std::mutex m_pending_record_mutex;
+    
+    // Для POST
     std::unordered_map<std::string, std::shared_ptr<std::promise<bool>>> m_pending_creates;
     std::mutex m_creates_mutex;
 };

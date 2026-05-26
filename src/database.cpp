@@ -78,3 +78,26 @@ std::vector<std::pair<std::string, std::string>> Database::getAllRecords() {
     sqlite3_finalize(stmt);
     return records;
 }
+
+std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(const std::string& id) {
+    const char* sql = "SELECT id, file_path, created_at FROM records WHERE id = ?;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << COLOR_DB_COM << "[Database] Prepare error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        return {false, "", "", ""};
+    }
+    
+    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        std::string found_id = (const char*)sqlite3_column_text(stmt, 0);
+        std::string path = (const char*)sqlite3_column_text(stmt, 1);
+        std::string created = (const char*)sqlite3_column_text(stmt, 2);
+        sqlite3_finalize(stmt);
+        return {true, found_id, path, created};
+    }
+    
+    sqlite3_finalize(stmt);
+    return {false, "", "", ""};
+}

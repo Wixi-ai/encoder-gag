@@ -18,7 +18,6 @@ void db_agent_t::so_define_agent() {
 
         bool success = m_db.saveRecord(msg.id, msg.file_path);
         
-        // Отправляем ответ HTTP-агенту
         msg_create_response response;
         response.id = msg.id;
         response.success = success;
@@ -35,7 +34,7 @@ void db_agent_t::so_define_agent() {
     });
 
     so_subscribe_self().event([this](const msg_get_records& msg) {
-        std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORDS request #" << msg.request_id << COLOR_RESET << std::endl;
+        std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET ALL RECORDS #" << msg.request_id << COLOR_RESET << std::endl;
 
         auto records = m_db.getAllRecords();
         std::cout << COLOR_DB << "  found: " << records.size() << " records" << COLOR_RESET << std::endl;
@@ -45,5 +44,27 @@ void db_agent_t::so_define_agent() {
         response.records = records;
 
         so_5::send<msg_get_records_response>(msg.reply_to, response);
+    });
+    
+    // НОВЫЙ ОБРАБОТЧИК: GET /records/{id}
+    so_subscribe_self().event([this](const msg_get_record_by_id& msg) {
+        std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET RECORD BY ID #" << msg.request_id << " id=" << msg.id << COLOR_RESET << std::endl;
+
+        auto [found, id, path, created] = m_db.getRecordById(msg.id);
+        
+        msg_get_record_by_id_response response;
+        response.request_id = msg.request_id;
+        response.found = found;
+        response.id = id;
+        response.file_path = path;
+        response.created_at = created;
+        
+        so_5::send<msg_get_record_by_id_response>(msg.reply_to, response);
+        
+        if (found) {
+            std::cout << COLOR_DB << "  found: " << id << COLOR_RESET << std::endl;
+        } else {
+            std::cout << COLOR_DB << "  not found" << COLOR_RESET << std::endl;
+        }
     });
 }

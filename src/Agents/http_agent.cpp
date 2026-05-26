@@ -14,7 +14,6 @@ void http_agent_t::so_evt_start()
 {
     printStartupInfo();
 
-    // Подписываемся на ответы от DB-агента для POST
     so_subscribe_self().event([this](const msg_create_response& response) {
         auto it = m_pending_creates.find(response.id);
         if (it != m_pending_creates.end()) {
@@ -24,13 +23,21 @@ void http_agent_t::so_evt_start()
         }
     });
 
-    // Подписываемся на ответы от DB-агента для GET
     so_subscribe_self().event([this](const msg_get_records_response& response) {
         auto it = m_pending_requests.find(response.request_id);
         if (it != m_pending_requests.end()) {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_mutex);
             m_pending_requests.erase(it);
+        }
+    });
+    
+    so_subscribe_self().event([this](const msg_get_record_by_id_response& response) {
+        auto it = m_pending_record_requests.find(response.request_id);
+        if (it != m_pending_record_requests.end()) {
+            it->second->set_value(response);
+            std::lock_guard<std::mutex> lock(m_pending_record_mutex);
+            m_pending_record_requests.erase(it);
         }
     });
 
@@ -43,7 +50,6 @@ void http_agent_t::so_evt_start()
 
         printRequest("POST", "/api/v1/records", m_request_counter, uuid.substr(0, 8), req.body);
 
-        // Создаём promise для ожидания ответа от DB-агента
         auto promise = std::make_shared<std::promise<bool>>();
         auto future = promise->get_future();
 
@@ -61,7 +67,6 @@ void http_agent_t::so_evt_start()
         so_5::send<msg_create_record>(m_db_mbox, msg);
         std::cout << COLOR_HTTP << "  -> DB Agent | sent, waiting for response" << COLOR_RESET << std::endl;
 
-        // Ждём ответ 5 секунд
         auto status = future.wait_for(std::chrono::seconds(5));
         if (status == std::future_status::ready && future.get()) {
             std::string response = "{\"status\": \"created\", \"id\": \"" + uuid + "\"}";
@@ -75,7 +80,7 @@ void http_agent_t::so_evt_start()
             printResponse(500, "{\"error\": \"failed to save record\"}");
         } });
 
-    m_server->Get("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res)
+    m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &req, httplib::Response &res)
                   {
         int request_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records", request_id, "", "");
@@ -104,6 +109,52 @@ void http_agent_t::so_evt_start()
 
             std::cout << COLOR_HTTP << "  <- DB Agent | response with " << response.records.size() << " records" << COLOR_RESET << std::endl;
             printResponse(200, j.dump().substr(0, 80) + (j.dump().size() > 80 ? "..." : ""));
+        } else {
+            std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
+            res.set_content("{\"error\": \"timeout\"}", "application/json");
+            res.status = 504;
+        } });
+    
+    m_server->Get(R"(/api/v1/records/(\w+-\w+-\w+-\w+-\w+))", [this](const httplib::Request &req, httplib::Response &res)
+                  {
+        std::string id = req.matches[1];
+        int request_id = ++m_request_id_counter;
+        printRequest("GET", "/api/v1/records/" + id, request_id, id.substr(0, 8), "");
+
+        auto promise = std::make_shared<std::promise<msg_get_record_by_id_response>>();
+        auto future = promise->get_future();
+
+        {
+            std::lock_guard<std::mutex> lock(m_pending_record_mutex);
+            m_pending_record_requests[request_id] = promise;
+        }
+
+        std::cout << COLOR_HTTP << "  -> DB Agent | request #" << request_id << " for id=" << id.substr(0, 8) << COLOR_RESET << std::endl;
+
+        msg_get_record_by_id msg;
+        msg.id = id;
+        msg.request_id = request_id;
+        msg.reply_to = so_direct_mbox();
+        
+        so_5::send<msg_get_record_by_id>(m_db_mbox, msg);
+
+        auto status = future.wait_for(std::chrono::seconds(5));
+        if (status == std::future_status::ready) {
+            auto response = future.get();
+            if (response.found) {
+                json j = {
+                    {"id", response.id},
+                    {"file_path", response.file_path},
+                    {"created_at", response.created_at}
+                };
+                res.set_content(j.dump(), "application/json");
+                res.status = 200;
+                printResponse(200, j.dump());
+            } else {
+                res.set_content("{\"error\": \"record not found\"}", "application/json");
+                res.status = 404;
+                printResponse(404, "{\"error\": \"record not found\"}");
+            }
         } else {
             std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
             res.set_content("{\"error\": \"timeout\"}", "application/json");
@@ -150,9 +201,10 @@ void http_agent_t::printStartupInfo()
   |  URL: http://localhost:8080                               |
   |                                                           |
   |  AVAILABLE ENDPOINTS:                                     |
-  |    POST   /api/v1/records    - Create new record          |
-  |    GET    /api/v1/records    - Get all records            |
-  |    GET    /health            - Health check               |
+  |    POST   /api/v1/records         - Create new record     |
+  |    GET    /api/v1/records         - Get all records       |
+  |    GET    /api/v1/records/{id}    - Get record by ID      |
+  |    GET    /health                 - Health check          |
   +-----------------------------------------------------------+
 )" << COLOR_RESET;
 
@@ -168,6 +220,9 @@ void http_agent_t::printStartupInfo()
   |                                                                              |
   |    # Get all records                                                         |
   |    ./scripts/get.sh                                                          |
+  |                                                                              |
+  |    # Get record by ID (replace {id} with actual UUID)                        |
+  |    ./scripts/get_by_id.sh {id}                                               |
   |                                                                              |
   +------------------------------------------------------------------------------+
 )" << COLOR_RESET << std::endl;

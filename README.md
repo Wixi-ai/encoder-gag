@@ -91,20 +91,26 @@ encoder_project/
 ├── include/ # Заголовочные файлы
 │ ├── colors.hpp # Цвета для консоли
 │ ├── utils.hpp # Утилиты (UUID, время)
-│ ├── database.hpp # Работа с SQLite3
+│ ├── database.hpp # Работа с SQLite3 (объявление)
 │ ├── messages.hpp # Сообщения между агентами
 │ └── agents/
-│ ├── db_agent.hpp # DB агент (интерфейс)
-│ └── http_agent.hpp # HTTP агент (интерфейс)
+│ ├── db_agent.hpp # DB агент (объявление)
+│ └── http_agent.hpp # HTTP агент (объявление)
 ├── src/ # Реализация
 │ ├── main.cpp # Точка входа
 │ ├── database.cpp # Реализация SQLite3
 │ └── agents/
 │ ├── db_agent.cpp # Реализация DB агента
 │ └── http_agent.cpp # Реализация HTTP агента
+├── scripts/ # Скрипты для тестирования
+│ ├── health.sh
+│ ├── create.sh
+│ └── get.sh
 ├── CMakeLists.txt
 ├── conanfile.txt
-├── logs.sh
+├── start.sh
+├── build.sh
+├── rebuild.sh
 └── README.md
 ```
 
