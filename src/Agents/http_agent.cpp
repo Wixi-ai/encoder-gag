@@ -52,7 +52,55 @@ void http_agent_t::so_evt_start()
 
     m_server = std::make_unique<httplib::Server>();
 
+    // POST /api/v1/records
     m_server->Post("/api/v1/records", [this](const httplib::Request &req, httplib::Response &res) {
+        // Проверка пустого тела
+        if (req.body.empty()) {
+            res.set_content("{\"error\": \"empty request body\"}", "application/json");
+            res.status = 400;
+            printResponse(400, "{\"error\": \"empty request body\"}");
+            return;
+        }
+        
+        // Валидация JSON
+        try {
+            json j = json::parse(req.body);
+            
+            // Проверка обязательных полей (по ТЗ нужны id, block_size, fblock, streams)
+            if (!j.contains("id") || !j["id"].is_string()) {
+                res.set_content("{\"error\": \"missing or invalid 'id' field\"}", "application/json");
+                res.status = 400;
+                printResponse(400, "{\"error\": \"missing or invalid 'id' field\"}");
+                return;
+            }
+            if (!j.contains("block_size") || !j["block_size"].is_number_integer()) {
+                res.set_content("{\"error\": \"missing or invalid 'block_size' field\"}", "application/json");
+                res.status = 400;
+                printResponse(400, "{\"error\": \"missing or invalid 'block_size' field\"}");
+                return;
+            }
+            if (!j.contains("fblock") || !j["fblock"].is_string()) {
+                res.set_content("{\"error\": \"missing or invalid 'fblock' field\"}", "application/json");
+                res.status = 400;
+                printResponse(400, "{\"error\": \"missing or invalid 'fblock' field\"}");
+                return;
+            }
+            
+            // Валидация streams (должен быть массив)
+            if (!j.contains("streams") || !j["streams"].is_array()) {
+                res.set_content("{\"error\": \"missing or invalid 'streams' field (must be array)\"}", "application/json");
+                res.status = 400;
+                printResponse(400, "{\"error\": \"missing or invalid 'streams' field (must be array)\"}");
+                return;
+            }
+            
+        } catch (const json::parse_error& e) {
+            res.set_content("{\"error\": \"invalid JSON format\"}", "application/json");
+            res.status = 400;
+            printResponse(400, "{\"error\": \"invalid JSON format\"}");
+            return;
+        }
+        
         m_request_counter++;
         std::string uuid = generate_uuid();
         printRequest("POST", "/api/v1/records", m_request_counter, uuid.substr(0, 8), req.body);
@@ -83,6 +131,7 @@ void http_agent_t::so_evt_start()
         }
     });
 
+    // GET /api/v1/records (все)
     m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &, httplib::Response &res) {
         int request_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records", request_id, "", "");
@@ -109,8 +158,17 @@ void http_agent_t::so_evt_start()
         }
     });
     
-    m_server->Get(R"(/api/v1/records/(\w+-\w+-\w+-\w+-\w+))", [this](const httplib::Request &req, httplib::Response &res) {
+    // GET /api/v1/records/{id}
+    m_server->Get(R"(/api/v1/records/([a-f0-9-]+))", [this](const httplib::Request &req, httplib::Response &res) {
         std::string id = req.matches[1];
+        
+        if (!is_valid_uuid(id)) {
+            res.set_content("{\"error\": \"invalid uuid format\"}", "application/json");
+            res.status = 400;
+            printResponse(400, "{\"error\": \"invalid uuid format\"}");
+            return;
+        }
+        
         int request_id = ++m_request_id_counter;
         printRequest("GET", "/api/v1/records/" + id, request_id, id.substr(0, 8), "");
 
@@ -140,8 +198,17 @@ void http_agent_t::so_evt_start()
         }
     });
     
-    m_server->Delete(R"(/api/v1/records/(\w+-\w+-\w+-\w+-\w+))", [this](const httplib::Request &req, httplib::Response &res) {
+    // DELETE /api/v1/records/{id}
+    m_server->Delete(R"(/api/v1/records/([a-f0-9-]+))", [this](const httplib::Request &req, httplib::Response &res) {
         std::string id = req.matches[1];
+        
+        if (!is_valid_uuid(id)) {
+            res.set_content("{\"error\": \"invalid uuid format\"}", "application/json");
+            res.status = 400;
+            printResponse(400, "{\"error\": \"invalid uuid format\"}");
+            return;
+        }
+        
         int request_id = ++m_request_id_counter;
         printRequest("DELETE", "/api/v1/records/" + id, request_id, id.substr(0, 8), "");
 
