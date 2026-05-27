@@ -69,7 +69,32 @@ cd encoders_gag
 # Удаление записи по ID
 ./scripts/delete.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 ```
+## 🔍 Фильтрация записей
 
+GET /api/v1/records поддерживает следующие параметры фильтрации:
+
+| Параметр | Описание | Пример |
+|----------|----------|--------|
+| `codec` | Фильтр по кодеку | `?codec=h264` |
+| `from_date` | Записи после указанной даты | `?from_date=2026-05-01` |
+| `to_date` | Записи до указанной даты | `?to_date=2026-05-31` |
+| `file_path` | Частичное совпадение пути | `?file_path=video` |
+
+### Примеры запросов с фильтрацией:
+
+```bash
+# Только кодек h264
+curl "http://localhost:8080/api/v1/records?codec=h264"
+
+# Записи после 1 мая 2026
+curl "http://localhost:8080/api/v1/records?from_date=2026-05-01"
+
+# Комбинация: кодек + диапазон дат + пагинация
+curl "http://localhost:8080/api/v1/records?codec=h264&from_date=2026-05-01&to_date=2026-05-31&limit=10&offset=0"
+
+# Поиск по части пути
+curl "http://localhost:8080/api/v1/records?file_path=video"
+```
 ## 🧪 Проверка работы сервера
 
 После запуска сервера откройте **новое окно терминала** (Git Bash) и выполните:

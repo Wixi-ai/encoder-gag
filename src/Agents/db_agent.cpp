@@ -34,10 +34,13 @@ void db_agent_t::so_define_agent() {
     so_subscribe_self().event([this](const msg_get_records& msg) {
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET ALL RECORDS #" << msg.request_id 
                   << " limit=" << msg.limit << " offset=" << msg.offset 
-                  << " sort_by=" << msg.sort_by << " sort_order=" << msg.sort_order << COLOR_RESET << std::endl;
+                  << " sort_by=" << msg.sort_by << " sort_order=" << msg.sort_order
+                  << " codec=" << msg.codec << " from=" << msg.from_date << " to=" << msg.to_date
+                  << " path=" << msg.file_path << COLOR_RESET << std::endl;
 
-        int total = m_db.getTotalRecordsCount();
-        auto records = m_db.getAllRecords(msg.limit, msg.offset, msg.sort_by, msg.sort_order);
+        int total = m_db.getFilteredCount(msg.codec, msg.from_date, msg.to_date, msg.file_path);
+        auto records = m_db.getFilteredRecords(msg.limit, msg.offset, msg.sort_by, msg.sort_order, 
+                                                msg.codec, msg.from_date, msg.to_date, msg.file_path);
         
         std::cout << COLOR_DB << "  found: " << records.size() << " records (total: " << total << ")" << COLOR_RESET << std::endl;
 

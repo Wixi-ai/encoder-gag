@@ -21,8 +21,13 @@ struct msg_get_records {
     int request_id;
     int limit;
     int offset;
-    std::string sort_by;      // поле для сортировки: "id", "created_at", "file_path"
-    std::string sort_order;   // направление: "asc" или "desc"
+    std::string sort_by;
+    std::string sort_order;
+    // Фильтры
+    std::string codec;      // фильтр по кодекам
+    std::string from_date;  // записи после даты (YYYY-MM-DD)
+    std::string to_date;    // записи до даты (YYYY-MM-DD)
+    std::string file_path;  // фильтр по пути (частичное совпадение)
     so_5::mbox_t reply_to;
 };
 
