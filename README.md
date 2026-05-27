@@ -93,9 +93,9 @@ curl --noproxy "localhost" http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cc
 # Удаление записи по ID
 curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
 ```
-```
-## 📁 Структура проекта
 
+## 📁 Структура проекта
+```
 
 encoder_project/
 ├── include/                              # Заголовочные файлы
@@ -163,12 +163,12 @@ encoder_project/
 ID записи должен быть в формате UUID (например, aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)
 
 
-```
+
 
 ## 🐳 Docker
 
 ### Сборка образа
-```bash
+```
 ./docker-build.sh
 Запуск контейнера
 
@@ -190,3 +190,4 @@ docker run -d -p 9090:8080 \
   -e ENCODERS_GAG_DB=/data/records.db \
   -v ./data:/data \
   --name encoders_gag encoders_gag:latest
+```
