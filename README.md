@@ -186,20 +186,20 @@ encoder_project/
 
 ## 🔄 Статус разработки
 
-- [x]HTTP сервер
-- [x]POST /api/v1/records
-- [x]GET /api/v1/records
-- [x]GET /api/v1/records/{id}
-- [x]DELETE /api/v1/records/{id}
-- [x]GET /health
-- [x]Пагинация
-- [x]Сортировка
-- [x]Фильтрация
-- [x]Валидация и обработка ошибок
-- [x]Логирование в файл
-- [x]Graceful shutdown
-- [x]Docker контейнеризация
-- [ ]ffmpeg_pool актор
+- [x] HTTP сервер
+- [x] POST /api/v1/records
+- [x] GET /api/v1/records
+- [x] GET /api/v1/records/{id}
+- [x] DELETE /api/v1/records/{id}
+- [x] GET /health
+- [x] Пагинация
+- [x] Сортировка
+- [x] Фильтрация
+- [x] Валидация и обработка ошибок
+- [x] Логирование в файл
+- [x] Graceful shutdown
+- [x] Docker контейнеризация
+- [ ] ffmpeg_pool актор
 
 ## 📝 Примечание
 
