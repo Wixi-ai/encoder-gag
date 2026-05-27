@@ -202,33 +202,48 @@ void http_agent_t::so_evt_start()
             LOG_WARN("HTTP", "Invalid JSON");
         } });
 
-    // GET /api/v1/records с поддержкой пагинации
+    // GET /api/v1/records с поддержкой пагинации и сортировки
     m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &req, httplib::Response &res)
                   {
-        // Парсим параметры limit и offset
-        int limit = 10;   // по умолчанию 10
-        int offset = 0;   // по умолчанию 0
+        // Парсим параметры
+        int limit = 10;
+        int offset = 0;
+        std::string sort_by = "created_at";
+        std::string sort_order = "asc";
         
         if (req.has_param("limit")) {
             limit = std::stoi(req.get_param_value("limit"));
             if (limit <= 0) limit = 10;
-            if (limit > 100) limit = 100; // максимум 100 записей
+            if (limit > 100) limit = 100;
         }
         if (req.has_param("offset")) {
             offset = std::stoi(req.get_param_value("offset"));
             if (offset < 0) offset = 0;
         }
+        if (req.has_param("sort_by")) {
+            sort_by = req.get_param_value("sort_by");
+            if (sort_by != "id" && sort_by != "file_path" && sort_by != "created_at") {
+                sort_by = "created_at";
+            }
+        }
+        if (req.has_param("sort_order")) {
+            sort_order = req.get_param_value("sort_order");
+            if (sort_order != "asc" && sort_order != "desc") {
+                sort_order = "asc";
+            }
+        }
         
         int req_id = ++m_request_id_counter;
-        printRequest("GET", "/api/v1/records?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset), 
-                     req_id, "", "");
-        LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id) + " limit=" + std::to_string(limit) + " offset=" + std::to_string(offset));
+        printRequest("GET", "/api/v1/records?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset) 
+                     + "&sort_by=" + sort_by + "&sort_order=" + sort_order, req_id, "", "");
+        LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id) + " limit=" + std::to_string(limit) 
+                  + " offset=" + std::to_string(offset) + " sort_by=" + sort_by + " sort_order=" + sort_order);
 
         auto promise = std::make_shared<std::promise<msg_get_records_response>>();
         auto future = promise->get_future();
         { std::lock_guard<std::mutex> lock(m_pending_mutex); m_pending_requests[req_id] = promise; }
 
-        so_5::send<msg_get_records>(m_db_mbox, req_id, limit, offset, so_direct_mbox());
+        so_5::send<msg_get_records>(m_db_mbox, req_id, limit, offset, sort_by, sort_order, so_direct_mbox());
 
         if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
@@ -248,6 +263,8 @@ void http_agent_t::so_evt_start()
             {"total", response.total},
             {"limit", response.limit},
             {"offset", response.offset},
+            {"sort_by", sort_by},
+            {"sort_order", sort_order},
             {"records", j}
         };
         
@@ -412,7 +429,7 @@ void http_agent_t::printStartupInfo()
               << "  |  AVAILABLE ENDPOINTS:                                                        |\n"
               << "  |                                                                              |\n"
               << "  |    POST   /api/v1/records         - Create new record                        |\n"
-              << "  |    GET    /api/v1/records         - Get all records (supports pagination)    |\n"
+              << "  |    GET    /api/v1/records         - Get all records (pagination + sorting)   |\n"
               << "  |    GET    /api/v1/records/{id}    - Get record by ID                         |\n"
               << "  |    DELETE /api/v1/records/{id}    - Delete record by ID                      |\n"
               << "  |    GET    /health                 - Health check                             |\n"
@@ -429,8 +446,8 @@ void http_agent_t::printStartupInfo()
               << "  |    # Create record                                                           |\n"
               << "  |    ./scripts/create.sh <uuid>                                                |\n"
               << "  |                                                                              |\n"
-              << "  |    # Get all records (with pagination)                                       |\n"
-              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/api/v1/records?limit=5&offset=0 |\n"
+              << "  |    # Get all records (sorted by id desc)                                     |\n"
+              << "  |    curl --noproxy \"localhost\" \"http://" << m_host << ":" << m_port << "/api/v1/records?sort_by=id&sort_order=desc\" |\n"
               << "  |                                                                              |\n"
               << "  |    # Get record by ID                                                        |\n"
               << "  |    ./scripts/get_by_id.sh <uuid>                                             |\n"

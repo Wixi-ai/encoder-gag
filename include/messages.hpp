@@ -21,6 +21,8 @@ struct msg_get_records {
     int request_id;
     int limit;
     int offset;
+    std::string sort_by;      // поле для сортировки: "id", "created_at", "file_path"
+    std::string sort_order;   // направление: "asc" или "desc"
     so_5::mbox_t reply_to;
 };
 

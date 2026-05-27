@@ -78,12 +78,23 @@ int Database::getTotalRecordsCount() {
     return count;
 }
 
-std::vector<std::pair<std::string, std::string>> Database::getAllRecords(int limit, int offset) {
+std::vector<std::pair<std::string, std::string>> Database::getAllRecords(int limit, int offset, const std::string& sort_by, const std::string& sort_order) {
     std::vector<std::pair<std::string, std::string>> records;
-    const char* sql = "SELECT id, file_path FROM records LIMIT ? OFFSET ?;";
+    
+    // Валидация sort_by (безопасность)
+    std::string valid_sort_by = "created_at";
+    if (sort_by == "id") valid_sort_by = "id";
+    else if (sort_by == "file_path") valid_sort_by = "file_path";
+    else if (sort_by == "created_at") valid_sort_by = "created_at";
+    
+    // Валидация sort_order
+    std::string valid_sort_order = "ASC";
+    if (sort_order == "desc" || sort_order == "DESC") valid_sort_order = "DESC";
+    
+    std::string sql = "SELECT id, file_path FROM records ORDER BY " + valid_sort_by + " " + valid_sort_order + " LIMIT ? OFFSET ?;";
     sqlite3_stmt* stmt;
     
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
         std::cerr << COLOR_DB_COM << "[Database] Read error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
         return records;
     }
