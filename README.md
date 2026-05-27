@@ -45,8 +45,8 @@ cd encoders_gag
 |-------|----------|----------|
 | POST | `/api/v1/records` | Создание новой записи |
 | GET | `/api/v1/records` | Получение списка записей |
-| GET | `/api/v1/records/{id}` | Получение списка записей |
-| DELETE | `/api/v1/records/{id}` | Получение списка записей |
+| GET | `/api/v1/records/{id}` | Получение записи по ID |
+| DELETE | `/api/v1/records/{id}` | Удаление записи по ID |
 | GET | `/health` | Проверка состояния сервера |
 
 ## 🚀 Быстрые скрипты для тестирования
@@ -57,17 +57,26 @@ cd encoders_gag
 # Проверка здоровья сервера
 ./scripts/health.sh
 
-# Создание новой записи (укажите UUID)
-./scripts/create.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+# Создание записи (UUID сгенерируется автоматически)
+./scripts/create.sh
 
-# Получение всех записей
-./scripts/get.sh
+# Создание записи с указанным UUID и путём
+./scripts/create.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" "/path/to/video.mp4"
+
+# Получение всех записей (пагинация: limit, offset)
+./scripts/get.sh 10 0
+
+# Получение записей с сортировкой
+./scripts/get_sorted.sh created_at desc 10 0
 
 # Получение записи по ID
 ./scripts/get_by_id.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 # Удаление записи по ID
 ./scripts/delete.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+# Тестирование обработки ошибок
+./scripts/test_errors.sh
 ```
 ## 🔍 Фильтрация записей
 
@@ -84,16 +93,13 @@ GET /api/v1/records поддерживает следующие параметр
 
 ```bash
 # Только кодек h264
-curl "http://localhost:8080/api/v1/records?codec=h264"
+./scripts/get_sorted.sh created_at asc 10 0 "codec=h264"
 
 # Записи после 1 мая 2026
-curl "http://localhost:8080/api/v1/records?from_date=2026-05-01"
+./scripts/get_sorted.sh created_at asc 10 0 "from_date=2026-05-01"
 
-# Комбинация: кодек + диапазон дат + пагинация
-curl "http://localhost:8080/api/v1/records?codec=h264&from_date=2026-05-01&to_date=2026-05-31&limit=10&offset=0"
-
-# Поиск по части пути
-curl "http://localhost:8080/api/v1/records?file_path=video"
+# Комбинация фильтров
+./scripts/get_sorted.sh created_at asc 5 0 "codec=h264&from_date=2026-05-01"
 ```
 ## 🧪 Проверка работы сервера
 
@@ -123,51 +129,48 @@ curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaa
 ```
 
 encoder_project/
+├── include/                          # Заголовочные файлы (.hpp)
+│   ├── colors.hpp                    # ANSI цвета для консоли
+│   ├── utils.hpp                     # Утилиты: current_time(), generate_uuid(), is_valid_uuid()
+│   ├── database.hpp                  # Работа с SQLite3 (объявление методов)
+│   ├── messages.hpp                  # Структуры сообщений между агентами
+│   ├── logger.hpp                    # Логирование в файл (класс Logger)
+│   ├── constants.hpp                 # Константы: DEFAULT_LIMIT, MAX_LIMIT, TIMEOUT_SECONDS
+│   └── agents/                       # Агенты (объявления)
+│       ├── db_agent.hpp              # DB агент — работа с базой данных
+│       └── http_agent.hpp            # HTTP агент — обработка запросов
 │
-├── include/                                 # Заголовочные файлы (.hpp)
-│   ├── colors.hpp                           # Цвета для консоли
-│   ├── utils.hpp                            # Утилиты (UUID, время, валидация)
-│   ├── database.hpp                         # Работа с SQLite3 (объявление)
-│   ├── messages.hpp                         # Сообщения между агентами
-│   ├── logger.hpp                           # Логирование в файл
-│   ├── constants.hpp                        # Константы (лимиты, таймауты)
-│   │
-│   └── agents/                              # Агенты (объявления)
-│       ├── db_agent.hpp
-│       └── http_agent.hpp
+├── src/                              # Реализация (.cpp)
+│   ├── main.cpp                      # Точка входа, инициализация, graceful shutdown
+│   ├── database.cpp                  # Реализация методов Database (SQLite3)
+│   └── agents/                       # Агенты (реализация)
+│       ├── db_agent.cpp              # DB агент — сохранение, чтение, удаление записей
+│       ├── http_agent.cpp            # HTTP агент — основная логика (конструктор, подписки)
+│       ├── http_handlers.cpp         # Обработчики маршрутов (POST, GET, DELETE)
+│       └── http_print.cpp            # Функции вывода (баннер, рамки, команды)
 │
-├── src/                                     # Реализация (.cpp)
-│   ├── main.cpp                             # Точка входа
-│   ├── database.cpp                         # Реализация SQLite3
-│   │
-│   └── agents/                              # Агенты (реализация)
-│       ├── db_agent.cpp
-│       ├── http_agent.cpp                   # Основная логика HTTP агента
-│       ├── http_handlers.cpp                # Обработчики маршрутов
-│       └── http_print.cpp                   # Вывод в консоль (баннер, рамки)
+├── scripts/                          # Bash скрипты для тестирования API
+│   ├── health.sh                     # Проверка здоровья сервера (GET /health)
+│   ├── create.sh                     # Создание записи (POST /api/v1/records)
+│   ├── get.sh                        # Получение всех записей с пагинацией
+│   ├── get_sorted.sh                 # Получение записей с сортировкой и фильтрацией
+│   ├── get_by_id.sh                  # Получение записи по ID
+│   ├── delete.sh                     # Удаление записи по ID
+│   └── test_errors.sh                # Тестирование обработки ошибок (400, 404, 409)
 │
-├── scripts/                                 # Скрипты для тестирования API
-│   ├── health.sh                            # Проверка здоровья
-│   ├── create.sh                            # Создание записи
-│   ├── get.sh                               # Получение всех записей
-│   ├── get_sorted.sh                        # Получение с сортировкой
-│   ├── get_by_id.sh                         # Получение записи по ID
-│   └── delete.sh                            # Удаление записи
+├── data/                             # Папка для данных БД (создаётся автоматически)
 │
-├── data/                                    # Папка для данных БД (создаётся автоматически)
+├── Dockerfile                        # Docker образ для контейнеризации
+├── docker-compose.yml                # Docker Compose для удобного запуска
 │
-├── CMakeLists.txt                           # Конфигурация сборки
-├── conanfile.txt                            # Зависимости Conan
+├── CMakeLists.txt                    # Конфигурация сборки CMake
+├── conanfile.txt                     # Зависимости Conan (cpp-httplib, nlohmann_json, sobjectizer, sqlite3)
 │
-├── Dockerfile                               # Docker образ
-├── docker-compose.yml                       # Docker Compose
-├── .dockerignore                            # Что игнорировать в Docker
+├── build.sh                          # Скрипт сборки проекта
+├── rebuild.sh                        # Полная пересборка с нуля
+├── start.sh                          # Запуск сервера (сборка + запуск)
 │
-├── build.sh                                 # Скрипт сборки
-├── rebuild.sh                               # Полная пересборка с нуля
-├── start.sh                                 # Запуск сервера
-│
-└── README.md                                # Документация
+└── README.md                         # Документация проекта
 ```
 
 ## 📦 Зависимости
@@ -183,14 +186,20 @@ encoder_project/
 
 ## 🔄 Статус разработки
 
-- [x] HTTP сервер
-- [x] POST /api/v1/records
-- [x] GET /api/v1/records (реальные данные из БД)
-- [x] SQLite3 сохранение
-- [x] Цветной вывод
-- [x] GET /api/v1/records/{id}
-- [x] DELETE /api/v1/records/{id}
-- [ ] ffmpeg_pool актор
+- [x]HTTP сервер
+- [x]POST /api/v1/records
+- [x]GET /api/v1/records
+- [x]GET /api/v1/records/{id}
+- [x]DELETE /api/v1/records/{id}
+- [x]GET /health
+- [x]Пагинация
+- [x]Сортировка
+- [x]Фильтрация
+- [x]Валидация и обработка ошибок
+- [x]Логирование в файл
+- [x]Graceful shutdown
+- [x]Docker контейнеризация
+- [ ]ffmpeg_pool актор
 
 ## 📝 Примечание
 
