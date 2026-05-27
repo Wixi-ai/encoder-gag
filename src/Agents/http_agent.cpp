@@ -9,6 +9,7 @@
 #include "../../include/logger.hpp"
 #include <nlohmann/json.hpp>
 #include <chrono>
+#include <sstream>
 
 using json = nlohmann::json;
 
@@ -201,17 +202,33 @@ void http_agent_t::so_evt_start()
             LOG_WARN("HTTP", "Invalid JSON");
         } });
 
-    m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &, httplib::Response &res)
+    // GET /api/v1/records с поддержкой пагинации
+    m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &req, httplib::Response &res)
                   {
+        // Парсим параметры limit и offset
+        int limit = 10;   // по умолчанию 10
+        int offset = 0;   // по умолчанию 0
+        
+        if (req.has_param("limit")) {
+            limit = std::stoi(req.get_param_value("limit"));
+            if (limit <= 0) limit = 10;
+            if (limit > 100) limit = 100; // максимум 100 записей
+        }
+        if (req.has_param("offset")) {
+            offset = std::stoi(req.get_param_value("offset"));
+            if (offset < 0) offset = 0;
+        }
+        
         int req_id = ++m_request_id_counter;
-        printRequest("GET", "/api/v1/records", req_id, "", "");
-        LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id));
+        printRequest("GET", "/api/v1/records?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset), 
+                     req_id, "", "");
+        LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id) + " limit=" + std::to_string(limit) + " offset=" + std::to_string(offset));
 
         auto promise = std::make_shared<std::promise<msg_get_records_response>>();
         auto future = promise->get_future();
         { std::lock_guard<std::mutex> lock(m_pending_mutex); m_pending_requests[req_id] = promise; }
 
-        so_5::send<msg_get_records>(m_db_mbox, req_id, so_direct_mbox());
+        so_5::send<msg_get_records>(m_db_mbox, req_id, limit, offset, so_direct_mbox());
 
         if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
@@ -226,10 +243,18 @@ void http_agent_t::so_evt_start()
         for (const auto& rec : response.records) {
             j.push_back({{"id", rec.first}, {"file_path", rec.second}});
         }
-        res.set_content(j.dump(), "application/json");
+        
+        json result = {
+            {"total", response.total},
+            {"limit", response.limit},
+            {"offset", response.offset},
+            {"records", j}
+        };
+        
+        res.set_content(result.dump(), "application/json");
         res.status = 200;
-        printResponse(200, j.dump().substr(0, 60) + (j.dump().size() > 60 ? "..." : ""));
-        LOG_INFO("HTTP", "Returned " + std::to_string(response.records.size()) + " records"); });
+        printResponse(200, result.dump().substr(0, 60) + (result.dump().size() > 60 ? "..." : ""));
+        LOG_INFO("HTTP", "Returned " + std::to_string(response.records.size()) + " records (total: " + std::to_string(response.total) + ")"); });
 
     m_server->Get(R"(/api/v1/records/([a-f0-9-]+))", [this](const httplib::Request &req, httplib::Response &res)
                   {
@@ -369,7 +394,7 @@ void http_agent_t::printStartupInfo()
               << "  ||                            ENCODERS_GAG v1.0                                 ||\n"
               << "  ||                     Server for Rigel Archive Module                          ||\n"
               << "  ||                                                                              ||\n"
-              << "  ||                     HTTP: " << std::left << std::setw(42) << (m_host + ":" + std::to_string(m_port)) << "         ||\n"
+              << "  ||                     HTTP: " << std::left << std::setw(42) << (m_host + ":" + std::to_string(m_port)) << "||\n"
               << "  ||                     API:  /api/v1/records                                    ||\n"
               << "  +--------------------------------------------------------------------------------+\n"
               << COLOR_RESET << std::endl;
@@ -378,16 +403,16 @@ void http_agent_t::printStartupInfo()
               << "  +------------------------------------------------------------------------------+\n"
               << "  |  [OK] SERVER STARTED SUCCESSFULLY                                            |\n"
               << "  +------------------------------------------------------------------------------+\n"
-              << "  |  URL: http://" << std::left << std::setw(54) << (m_host + ":" + std::to_string(m_port)) << "          |\n"
+              << "  |  URL: http://" << std::left << std::setw(54) << (m_host + ":" + std::to_string(m_port)) << "|\n"
               << "  +------------------------------------------------------------------------------+\n"
               << COLOR_RESET;
 
-    std::cout << COLOR_MAIN << "\n"
+    std::cout << COLOR_CYAN << "\n"
               << "  +------------------------------------------------------------------------------+\n"
               << "  |  AVAILABLE ENDPOINTS:                                                        |\n"
               << "  |                                                                              |\n"
               << "  |    POST   /api/v1/records         - Create new record                        |\n"
-              << "  |    GET    /api/v1/records         - Get all records                          |\n"
+              << "  |    GET    /api/v1/records         - Get all records (supports pagination)    |\n"
               << "  |    GET    /api/v1/records/{id}    - Get record by ID                         |\n"
               << "  |    DELETE /api/v1/records/{id}    - Delete record by ID                      |\n"
               << "  |    GET    /health                 - Health check                             |\n"
@@ -399,13 +424,13 @@ void http_agent_t::printStartupInfo()
               << "  |  TEST COMMANDS (run in another terminal):                                    |\n"
               << "  |                                                                              |\n"
               << "  |    # Health check                                                            |\n"
-              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/health                   |\n"
+              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/health |\n"
               << "  |                                                                              |\n"
               << "  |    # Create record                                                           |\n"
               << "  |    ./scripts/create.sh <uuid>                                                |\n"
               << "  |                                                                              |\n"
-              << "  |    # Get all records                                                         |\n"
-              << "  |    ./scripts/get.sh                                                          |\n"
+              << "  |    # Get all records (with pagination)                                       |\n"
+              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/api/v1/records?limit=5&offset=0 |\n"
               << "  |                                                                              |\n"
               << "  |    # Get record by ID                                                        |\n"
               << "  |    ./scripts/get_by_id.sh <uuid>                                             |\n"

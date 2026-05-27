@@ -12,7 +12,8 @@ public:
     ~Database();
 
     bool saveRecord(const std::string& id, const std::string& file_path);
-    std::vector<std::pair<std::string, std::string>> getAllRecords();
+    std::vector<std::pair<std::string, std::string>> getAllRecords(int limit, int offset);
+    int getTotalRecordsCount();
     std::tuple<bool, std::string, std::string, std::string> getRecordById(const std::string& id);
     bool deleteRecordById(const std::string& id);
 

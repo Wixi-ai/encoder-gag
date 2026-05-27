@@ -32,13 +32,19 @@ void db_agent_t::so_define_agent() {
     });
 
     so_subscribe_self().event([this](const msg_get_records& msg) {
-        std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET ALL RECORDS #" << msg.request_id << COLOR_RESET << std::endl;
+        std::cout << COLOR_DB << "[" << current_time() << "] [DB] GET ALL RECORDS #" << msg.request_id 
+                  << " limit=" << msg.limit << " offset=" << msg.offset << COLOR_RESET << std::endl;
 
-        auto records = m_db.getAllRecords();
-        std::cout << COLOR_DB << "  found: " << records.size() << " records" << COLOR_RESET << std::endl;
+        int total = m_db.getTotalRecordsCount();
+        auto records = m_db.getAllRecords(msg.limit, msg.offset);
+        
+        std::cout << COLOR_DB << "  found: " << records.size() << " records (total: " << total << ")" << COLOR_RESET << std::endl;
 
         msg_get_records_response response;
         response.request_id = msg.request_id;
+        response.total = total;
+        response.limit = msg.limit;
+        response.offset = msg.offset;
         response.records = records;
         so_5::send<msg_get_records_response>(msg.reply_to, response);
     });

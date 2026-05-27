@@ -61,15 +61,35 @@ bool Database::saveRecord(const std::string& id, const std::string& file_path) {
     return true;
 }
 
-std::vector<std::pair<std::string, std::string>> Database::getAllRecords() {
+int Database::getTotalRecordsCount() {
+    const char* sql = "SELECT COUNT(*) FROM records;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << COLOR_DB_COM << "[Database] Count error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        return 0;
+    }
+    
+    int count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        count = sqlite3_column_int(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    return count;
+}
+
+std::vector<std::pair<std::string, std::string>> Database::getAllRecords(int limit, int offset) {
     std::vector<std::pair<std::string, std::string>> records;
-    const char* sql = "SELECT id, file_path FROM records;";
+    const char* sql = "SELECT id, file_path FROM records LIMIT ? OFFSET ?;";
     sqlite3_stmt* stmt;
     
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         std::cerr << COLOR_DB_COM << "[Database] Read error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
         return records;
     }
+    
+    sqlite3_bind_int(stmt, 1, limit);
+    sqlite3_bind_int(stmt, 2, offset);
     
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         records.emplace_back(

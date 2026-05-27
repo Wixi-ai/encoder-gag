@@ -19,11 +19,16 @@ struct msg_create_response {
 
 struct msg_get_records {
     int request_id;
+    int limit;
+    int offset;
     so_5::mbox_t reply_to;
 };
 
 struct msg_get_records_response {
     int request_id;
+    int total;
+    int limit;
+    int offset;
     std::vector<std::pair<std::string, std::string>> records;
 };
 
