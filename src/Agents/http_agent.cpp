@@ -89,6 +89,12 @@ static bool validatePostRequest(const json &j, httplib::Response &res)
 
 static std::chrono::steady_clock::time_point start_time;
 
+// Константы
+const int DEFAULT_LIMIT = 10;
+const int MAX_LIMIT = 100;
+const int TIMEOUT_SECONDS = 5;
+const int DB_TIMEOUT_SECONDS = 5;
+
 http_agent_t::http_agent_t(context_t ctx, so_5::mbox_t db_mbox, const std::string &host, int port)
     : so_5::agent_t{std::move(ctx)}, m_db_mbox{std::move(db_mbox)}, m_request_counter(0), m_request_id_counter(0), m_host(host), m_port(port)
 {
@@ -157,9 +163,12 @@ void http_agent_t::so_evt_start()
             }
 
             std::string id = j["id"].get<std::string>();
+            // Берём file_path из запроса, если нет — используем значение по умолчанию
+            std::string file_path = j.contains("file_path") ? j["file_path"].get<std::string>() : "C:/default/video.mp4";
+
             m_request_counter++;
             printRequest("POST", "/api/v1/records", m_request_counter, id.substr(0, 8), req.body);
-            LOG_INFO("HTTP", "POST #" + std::to_string(m_request_counter) + " id=" + id);
+            LOG_INFO("HTTP", "POST #" + std::to_string(m_request_counter) + " id=" + id + " path=" + file_path);
 
             auto promise = std::make_shared<std::promise<bool>>();
             auto future = promise->get_future();
@@ -167,14 +176,14 @@ void http_agent_t::so_evt_start()
 
             msg_create_record msg;
             msg.id = id;
-            msg.file_path = "C:/test/video.mp4";
+            msg.file_path = file_path;
             msg.request_body = req.body;
             msg.reply_to = so_direct_mbox();
             so_5::send<msg_create_record>(m_db_mbox, msg);
 
             std::cout << COLOR_HTTP << "  -> DB Agent | sent, waiting for response" << COLOR_RESET << std::endl;
 
-            if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+            if (future.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) != std::future_status::ready) {
                 std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
                 res.set_content("{\"error\": \"timeout\"}", "application/json");
                 res.status = 504;
@@ -184,7 +193,7 @@ void http_agent_t::so_evt_start()
             }
 
             if (future.get()) {
-                std::string response = "{\"status\": \"created\", \"id\": \"" + id + "\"}";
+                std::string response = "{\"status\": \"created\", \"id\": \"" + id + "\", \"file_path\": \"" + file_path + "\"}";
                 res.set_content(response, "application/json");
                 res.status = 201;
                 printResponse(201, response);
@@ -205,16 +214,15 @@ void http_agent_t::so_evt_start()
     // GET /api/v1/records с поддержкой пагинации и сортировки
     m_server->Get(R"(/api/v1/records)", [this](const httplib::Request &req, httplib::Response &res)
                   {
-        // Парсим параметры
-        int limit = 10;
+        int limit = DEFAULT_LIMIT;
         int offset = 0;
         std::string sort_by = "created_at";
         std::string sort_order = "asc";
-        
+
         if (req.has_param("limit")) {
             limit = std::stoi(req.get_param_value("limit"));
-            if (limit <= 0) limit = 10;
-            if (limit > 100) limit = 100;
+            if (limit <= 0) limit = DEFAULT_LIMIT;
+            if (limit > MAX_LIMIT) limit = MAX_LIMIT;
         }
         if (req.has_param("offset")) {
             offset = std::stoi(req.get_param_value("offset"));
@@ -232,11 +240,11 @@ void http_agent_t::so_evt_start()
                 sort_order = "asc";
             }
         }
-        
+
         int req_id = ++m_request_id_counter;
-        printRequest("GET", "/api/v1/records?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset) 
+        printRequest("GET", "/api/v1/records?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset)
                      + "&sort_by=" + sort_by + "&sort_order=" + sort_order, req_id, "", "");
-        LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id) + " limit=" + std::to_string(limit) 
+        LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id) + " limit=" + std::to_string(limit)
                   + " offset=" + std::to_string(offset) + " sort_by=" + sort_by + " sort_order=" + sort_order);
 
         auto promise = std::make_shared<std::promise<msg_get_records_response>>();
@@ -245,7 +253,7 @@ void http_agent_t::so_evt_start()
 
         so_5::send<msg_get_records>(m_db_mbox, req_id, limit, offset, sort_by, sort_order, so_direct_mbox());
 
-        if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+        if (future.wait_for(std::chrono::seconds(DB_TIMEOUT_SECONDS)) != std::future_status::ready) {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
             printResponse(504, "{\"error\": \"timeout\"}");
@@ -258,7 +266,7 @@ void http_agent_t::so_evt_start()
         for (const auto& rec : response.records) {
             j.push_back({{"id", rec.first}, {"file_path", rec.second}});
         }
-        
+
         json result = {
             {"total", response.total},
             {"limit", response.limit},
@@ -267,7 +275,7 @@ void http_agent_t::so_evt_start()
             {"sort_order", sort_order},
             {"records", j}
         };
-        
+
         res.set_content(result.dump(), "application/json");
         res.status = 200;
         printResponse(200, result.dump().substr(0, 60) + (result.dump().size() > 60 ? "..." : ""));
@@ -298,7 +306,7 @@ void http_agent_t::so_evt_start()
         msg.reply_to = so_direct_mbox();
         so_5::send<msg_get_record_by_id>(m_db_mbox, msg);
 
-        if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+        if (future.wait_for(std::chrono::seconds(DB_TIMEOUT_SECONDS)) != std::future_status::ready) {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
             printResponse(504, "{\"error\": \"timeout\"}");
@@ -345,7 +353,7 @@ void http_agent_t::so_evt_start()
         msg.reply_to = so_direct_mbox();
         so_5::send<msg_delete_record_by_id>(m_db_mbox, msg);
 
-        if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+        if (future.wait_for(std::chrono::seconds(DB_TIMEOUT_SECONDS)) != std::future_status::ready) {
             res.set_content("{\"error\": \"timeout\"}", "application/json");
             res.status = 504;
             printResponse(504, "{\"error\": \"timeout\"}");
@@ -411,7 +419,7 @@ void http_agent_t::printStartupInfo()
               << "  ||                            ENCODERS_GAG v1.0                                 ||\n"
               << "  ||                     Server for Rigel Archive Module                          ||\n"
               << "  ||                                                                              ||\n"
-              << "  ||                     HTTP: " << std::left << std::setw(42) << (m_host + ":" + std::to_string(m_port)) << "||\n"
+              << "  ||                     HTTP: " << std::left << std::setw(42) << (m_host + ":" + std::to_string(m_port)) << "         ||\n"
               << "  ||                     API:  /api/v1/records                                    ||\n"
               << "  +--------------------------------------------------------------------------------+\n"
               << COLOR_RESET << std::endl;
@@ -420,7 +428,7 @@ void http_agent_t::printStartupInfo()
               << "  +------------------------------------------------------------------------------+\n"
               << "  |  [OK] SERVER STARTED SUCCESSFULLY                                            |\n"
               << "  +------------------------------------------------------------------------------+\n"
-              << "  |  URL: http://" << std::left << std::setw(54) << (m_host + ":" + std::to_string(m_port)) << "|\n"
+              << "  |  URL: http://" << std::left << std::setw(54) << (m_host + ":" + std::to_string(m_port)) << "        |\n"
               << "  +------------------------------------------------------------------------------+\n"
               << COLOR_RESET;
 
@@ -441,13 +449,13 @@ void http_agent_t::printStartupInfo()
               << "  |  TEST COMMANDS (run in another terminal):                                    |\n"
               << "  |                                                                              |\n"
               << "  |    # Health check                                                            |\n"
-              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/health |\n"
+              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/health         |\n"
               << "  |                                                                              |\n"
-              << "  |    # Create record                                                           |\n"
-              << "  |    ./scripts/create.sh <uuid>                                                |\n"
+              << "  |    # Create record with file path                                            |\n"
+              << "  |    ./scripts/create.sh <uuid> </path/to/file>                                |\n"
               << "  |                                                                              |\n"
-              << "  |    # Get all records (sorted by id desc)                                     |\n"
-              << "  |    curl --noproxy \"localhost\" \"http://" << m_host << ":" << m_port << "/api/v1/records?sort_by=id&sort_order=desc\" |\n"
+              << "  |    # Get all records (sorted)                                                |\n"
+              << "  |    ./scripts/get_sorted.sh [sort_by] [sort_order] [limit] [offset]           |\n"
               << "  |                                                                              |\n"
               << "  |    # Get record by ID                                                        |\n"
               << "  |    ./scripts/get_by_id.sh <uuid>                                             |\n"

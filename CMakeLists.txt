@@ -4,6 +4,9 @@ project(encoder_project)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Добавляем флаги предупреждений
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif()
@@ -22,7 +25,7 @@ find_package(SQLite3 REQUIRED)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(${PROJECT_NAME}
+add_executable(${PROJECT_NAME} 
     src/main.cpp
     src/database.cpp
     src/agents/db_agent.cpp
