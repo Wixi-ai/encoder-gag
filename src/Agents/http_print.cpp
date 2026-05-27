@@ -11,7 +11,7 @@ void http_agent_t::printStartupInfo()
               << "  ||                            ENCODERS_GAG v1.0                                 ||\n"
               << "  ||                     Server for Rigel Archive Module                          ||\n"
               << "  ||                                                                              ||\n"
-              << "  ||                     HTTP: " << std::left << std::setw(42) << (m_host + ":" + std::to_string(m_port)) << "||\n"
+              << "  ||                     HTTP: " << std::left << std::setw(42) << (m_host + ":" + std::to_string(m_port)) << "         ||\n"
               << "  ||                     API:  /api/v1/records                                    ||\n"
               << "  +--------------------------------------------------------------------------------+\n"
               << COLOR_RESET << std::endl;
@@ -20,7 +20,7 @@ void http_agent_t::printStartupInfo()
               << "  +------------------------------------------------------------------------------+\n"
               << "  |  [OK] SERVER STARTED SUCCESSFULLY                                            |\n"
               << "  +------------------------------------------------------------------------------+\n"
-              << "  |  URL: http://" << std::left << std::setw(54) << (m_host + ":" + std::to_string(m_port)) << "|\n"
+              << "  |  URL: http://" << std::left << std::setw(54) << (m_host + ":" + std::to_string(m_port)) << "          |\n"
               << "  +------------------------------------------------------------------------------+\n"
               << COLOR_RESET;
 
@@ -41,13 +41,13 @@ void http_agent_t::printStartupInfo()
               << "  |  TEST COMMANDS (run in another terminal):                                    |\n"
               << "  |                                                                              |\n"
               << "  |    # Health check                                                            |\n"
-              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/health |\n"
+              << "  |    curl --noproxy \"localhost\" http://" << m_host << ":" << m_port << "/health                   |\n"
               << "  |                                                                              |\n"
               << "  |    # Create record with file path                                            |\n"
               << "  |    ./scripts/create.sh <uuid> </path/to/file>                                |\n"
               << "  |                                                                              |\n"
               << "  |    # Get all records (sorted)                                                |\n"
-              << "  |    ./scripts/get_sorted.sh [sort_by] [sort_order] [limit] [offset]          |\n"
+              << "  |    ./scripts/get_sorted.sh [sort_by] [sort_order] [limit] [offset]           |\n"
               << "  |                                                                              |\n"
               << "  |    # Get record by ID                                                        |\n"
               << "  |    ./scripts/get_by_id.sh <uuid>                                             |\n"

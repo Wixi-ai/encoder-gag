@@ -165,3 +165,29 @@ ID записи должен быть в формате UUID (например, 
 
 © 2026 Rigel. Все права защищены.
 ```
+
+## 🐳 Docker
+
+### Сборка образа
+```bash
+./docker-build.sh
+Запуск контейнера
+
+./docker-run.sh
+Запуск через docker-compose
+
+./docker-compose-up.sh
+Остановка
+
+./docker-compose-down.sh
+Просмотр логов
+
+docker logs -f encoders_gag
+Переменные окружения в Docker
+
+docker run -d -p 9090:8080 \
+  -e ENCODERS_GAG_PORT=8080 \
+  -e ENCODERS_GAG_HOST=0.0.0.0 \
+  -e ENCODERS_GAG_DB=/data/records.db \
+  -v ./data:/data \
+  --name encoders_gag encoders_gag:latest
