@@ -92,10 +92,11 @@ curl --noproxy "localhost" http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cc
 
 # Удаление записи по ID
 curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-
+```
+```
 ## 📁 Структура проекта
 
-```
+
 encoder_project/
 ├── include/                              # Заголовочные файлы
 │   ├── colors.hpp                        # Цвета для консоли
@@ -161,9 +162,7 @@ encoder_project/
 
 ID записи должен быть в формате UUID (например, aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)
 
-## 📝 Лицензия
 
-© 2026 Rigel. Все права защищены.
 ```
 
 ## 🐳 Docker
