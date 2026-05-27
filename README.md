@@ -98,40 +98,51 @@ curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaa
 ```
 
 encoder_project/
-├── include/                              # Заголовочные файлы
-│   ├── colors.hpp                        # Цвета для консоли
-│   ├── utils.hpp                         # Утилиты (UUID, время, валидация)
-│   ├── database.hpp                      # Работа с SQLite3 (объявление)
-│   ├── messages.hpp                      # Сообщения между агентами
-│   ├── logger.hpp                        # Логирование в файл
-│   ├── constants.hpp                     # Константы (лимиты, таймауты)
-│   └── agents/
-│       ├── db_agent.hpp                  # DB агент (объявление)
-│       └── http_agent.hpp                # HTTP агент (объявление)
 │
-├── src/                                  # Реализация
-│   ├── main.cpp                          # Точка входа
-│   ├── database.cpp                      # Реализация SQLite3
-│   └── agents/
-│       ├── db_agent.cpp                  # Реализация DB агента
-│       ├── http_agent.cpp                # HTTP агент (основная логика)
-│       ├── http_handlers.cpp             # Обработчики маршрутов
-│       └── http_print.cpp                # Функции вывода (баннер, рамки)
+├── include/                                 # Заголовочные файлы (.hpp)
+│   ├── colors.hpp                           # Цвета для консоли
+│   ├── utils.hpp                            # Утилиты (UUID, время, валидация)
+│   ├── database.hpp                         # Работа с SQLite3 (объявление)
+│   ├── messages.hpp                         # Сообщения между агентами
+│   ├── logger.hpp                           # Логирование в файл
+│   ├── constants.hpp                        # Константы (лимиты, таймауты)
+│   │
+│   └── agents/                              # Агенты (объявления)
+│       ├── db_agent.hpp
+│       └── http_agent.hpp
 │
-├── scripts/                              # Скрипты для тестирования
-│   ├── health.sh                         # Проверка здоровья
-│   ├── create.sh                         # Создание записи
-│   ├── get.sh                            # Получение всех записей
-│   ├── get_sorted.sh                     # Получение с сортировкой
-│   ├── get_by_id.sh                      # Получение по ID
-│   └── delete.sh                         # Удаление записи
+├── src/                                     # Реализация (.cpp)
+│   ├── main.cpp                             # Точка входа
+│   ├── database.cpp                         # Реализация SQLite3
+│   │
+│   └── agents/                              # Агенты (реализация)
+│       ├── db_agent.cpp
+│       ├── http_agent.cpp                   # Основная логика HTTP агента
+│       ├── http_handlers.cpp                # Обработчики маршрутов
+│       └── http_print.cpp                   # Вывод в консоль (баннер, рамки)
 │
-├── CMakeLists.txt                        # Конфигурация сборки
-├── conanfile.txt                         # Зависимости
-├── build.sh                              # Скрипт сборки
-├── rebuild.sh                            # Скрипт полной пересборки
-├── start.sh                              # Скрипт запуска
-└── README.md                             # Документация
+├── scripts/                                 # Скрипты для тестирования API
+│   ├── health.sh                            # Проверка здоровья
+│   ├── create.sh                            # Создание записи
+│   ├── get.sh                               # Получение всех записей
+│   ├── get_sorted.sh                        # Получение с сортировкой
+│   ├── get_by_id.sh                         # Получение записи по ID
+│   └── delete.sh                            # Удаление записи
+│
+├── data/                                    # Папка для данных БД (создаётся автоматически)
+│
+├── CMakeLists.txt                           # Конфигурация сборки
+├── conanfile.txt                            # Зависимости Conan
+│
+├── Dockerfile                               # Docker образ
+├── docker-compose.yml                       # Docker Compose
+├── .dockerignore                            # Что игнорировать в Docker
+│
+├── build.sh                                 # Скрипт сборки
+├── rebuild.sh                               # Полная пересборка с нуля
+├── start.sh                                 # Запуск сервера
+│
+└── README.md                                # Документация
 ```
 
 ## 📦 Зависимости
