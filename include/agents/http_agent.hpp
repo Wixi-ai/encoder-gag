@@ -22,6 +22,13 @@ public:
     void so_evt_finish() override;
 
 private:
+    // Обработчики маршрутов
+    void handlePost(const httplib::Request& req, httplib::Response& res);
+    void handleGetAll(const httplib::Request& req, httplib::Response& res);
+    void handleGetById(const std::string& id, httplib::Response& res);
+    void handleDelete(const std::string& id, httplib::Response& res);
+    
+    // Функции вывода
     void printStartupInfo();
     void printRequest(const std::string& method, const std::string& path, int num, const std::string& id, const std::string& body);
     void printResponse(int status, const std::string& body);

@@ -97,32 +97,40 @@ curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaa
 
 ```
 encoder_project/
-├── include/                     # Заголовочные файлы
-│   ├── colors.hpp               # Цвета для консоли
-│   ├── utils.hpp                # Утилиты (UUID, время, валидация)
-│   ├── database.hpp             # Работа с SQLite3 (объявление)
-│   ├── messages.hpp             # Сообщения между агентами
+├── include/                              # Заголовочные файлы
+│   ├── colors.hpp                        # Цвета для консоли
+│   ├── utils.hpp                         # Утилиты (UUID, время, валидация)
+│   ├── database.hpp                      # Работа с SQLite3 (объявление)
+│   ├── messages.hpp                      # Сообщения между агентами
+│   ├── logger.hpp                        # Логирование в файл
+│   ├── constants.hpp                     # Константы (лимиты, таймауты)
 │   └── agents/
-│       ├── db_agent.hpp         # DB агент (объявление)
-│       └── http_agent.hpp       # HTTP агент (объявление)
-├── src/                         # Реализация
-│   ├── main.cpp                 # Точка входа
-│   ├── database.cpp             # Реализация SQLite3
+│       ├── db_agent.hpp                  # DB агент (объявление)
+│       └── http_agent.hpp                # HTTP агент (объявление)
+│
+├── src/                                  # Реализация
+│   ├── main.cpp                          # Точка входа
+│   ├── database.cpp                      # Реализация SQLite3
 │   └── agents/
-│       ├── db_agent.cpp         # Реализация DB агента
-│       └── http_agent.cpp       # Реализация HTTP агента
-├── scripts/                     # Скрипты для тестирования
-│   ├── health.sh
-│   ├── create.sh
-│   ├── get.sh
-│   ├── get_by_id.sh
-│   └── delete.sh
-├── CMakeLists.txt
-├── conanfile.txt
-├── start.sh
-├── build.sh
-├── rebuild.sh
-└── README.md
+│       ├── db_agent.cpp                  # Реализация DB агента
+│       ├── http_agent.cpp                # HTTP агент (основная логика)
+│       ├── http_handlers.cpp             # Обработчики маршрутов
+│       └── http_print.cpp                # Функции вывода (баннер, рамки)
+│
+├── scripts/                              # Скрипты для тестирования
+│   ├── health.sh                         # Проверка здоровья
+│   ├── create.sh                         # Создание записи
+│   ├── get.sh                            # Получение всех записей
+│   ├── get_sorted.sh                     # Получение с сортировкой
+│   ├── get_by_id.sh                      # Получение по ID
+│   └── delete.sh                         # Удаление записи
+│
+├── CMakeLists.txt                        # Конфигурация сборки
+├── conanfile.txt                         # Зависимости
+├── build.sh                              # Скрипт сборки
+├── rebuild.sh                            # Скрипт полной пересборки
+├── start.sh                              # Скрипт запуска
+└── README.md                             # Документация
 ```
 
 ## 📦 Зависимости

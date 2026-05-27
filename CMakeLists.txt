@@ -4,7 +4,6 @@ project(encoder_project)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Добавляем флаги предупреждений
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -30,6 +29,8 @@ add_executable(${PROJECT_NAME}
     src/database.cpp
     src/agents/db_agent.cpp
     src/agents/http_agent.cpp
+    src/agents/http_handlers.cpp
+    src/agents/http_print.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
