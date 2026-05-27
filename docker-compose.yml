@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   encoders_gag:
     build: .
@@ -8,7 +7,5 @@ services:
     environment:
       - ENCODERS_GAG_PORT=8080
       - ENCODERS_GAG_HOST=0.0.0.0
-      - ENCODERS_GAG_DB=/data/records.db
     volumes:
       - ./data:/data
-    restart: unless-stopped
