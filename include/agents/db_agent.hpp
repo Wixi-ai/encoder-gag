@@ -9,7 +9,7 @@
 
 class db_agent_t : public so_5::agent_t {
 public:
-    db_agent_t(context_t ctx);
+    db_agent_t(context_t ctx, const std::string& db_path = "records.db");
     void so_define_agent() override;
 
 private:
