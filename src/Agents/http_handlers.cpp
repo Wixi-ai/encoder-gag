@@ -1,4 +1,3 @@
-#include <filesystem>
 #include "../../include/agents/http_agent.hpp"
 #include "../../include/colors.hpp"
 #include "../../include/utils.hpp"
@@ -112,49 +111,9 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
         printRequest("POST", "/api/v1/records", m_request_counter, id.substr(0, 8), req.body);
         LOG_INFO("HTTP", "POST #" + std::to_string(m_request_counter) + " id=" + id + " path=" + file_path);
 
-        // Сначала отправляем видео на обработку в ffmpeg_pool
-        auto video_promise = std::make_shared<std::promise<msg_video_params>>();
-        auto video_future = video_promise->get_future();
-        {
-            std::lock_guard<std::mutex> lock(m_pending_video_mutex);
-            m_pending_video_requests[m_request_counter] = video_promise;
-        }
-        
-        msg_process_video video_msg;
-        video_msg.record_id = id;
-        video_msg.file_path = file_path;
-        video_msg.request_id = m_request_counter;
-        video_msg.reply_to = so_direct_mbox();
-        so_5::send<msg_process_video>(m_ffmpeg_mbox, video_msg);
-        
-        std::cout << COLOR_HTTP << "  -> FFmpeg Agent | sent for processing" << COLOR_RESET << std::endl;
-        
-        // Ждём результат от ffmpeg
-        if (video_future.wait_for(std::chrono::seconds(config::TIMEOUT_SECONDS)) != std::future_status::ready)
-        {
-            std::cout << COLOR_RED << "  [ERROR] Timeout waiting for ffmpeg response" << COLOR_RESET << std::endl;
-            res.set_content("{\"error\": \"video processing timeout\"}", "application/json");
-            res.status = static_cast<int>(HttpStatus::GATEWAY_TIMEOUT);
-            printResponse(res.status, "{\"error\": \"video processing timeout\"}");
-            LOG_ERROR("HTTP", "Timeout waiting for ffmpeg for id=" + id);
-            return;
-        }
-        
-        auto video_params = video_future.get();
-        if (!video_params.success)
-        {
-            std::cout << COLOR_RED << "  [ERROR] Video processing failed" << COLOR_RESET << std::endl;
-            res.set_content("{\"error\": \"video processing failed\"}", "application/json");
-            res.status = static_cast<int>(HttpStatus::INTERNAL_SERVER_ERROR);
-            printResponse(res.status, "{\"error\": \"video processing failed\"}");
-            LOG_ERROR("HTTP", "Video processing failed for id=" + id);
-            return;
-        }
-        
-        std::cout << COLOR_HTTP << "  <- FFmpeg Agent | params: " << video_params.width << "x" << video_params.height 
-                  << " codec=" << video_params.codec << COLOR_RESET << std::endl;
-        
-        // Затем сохраняем в БД
+        // Инвалидируем кеш после создания новой записи
+        m_records_cache.invalidateAll();
+
         auto promise = std::make_shared<std::promise<bool>>();
         auto future = promise->get_future();
         {
@@ -183,7 +142,7 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
 
         if (future.get())
         {
-            std::string response = "{\"status\": \"created\", \"id\": \"" + id + "\", \"file_path\": \"" + file_path + "\", \"video_params\": {\"codec\": \"" + video_params.codec + "\", \"width\": " + std::to_string(video_params.width) + ", \"height\": " + std::to_string(video_params.height) + "}}";
+            std::string response = "{\"status\": \"created\", \"id\": \"" + id + "\", \"file_path\": \"" + file_path + "\"}";
             res.set_content(response, "application/json");
             res.status = static_cast<int>(HttpStatus::CREATED);
             printResponse(res.status, response);
@@ -249,14 +208,25 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
 
     int req_id = ++m_request_id_counter;
     
-    std::string path = "/api/v1/records?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset) 
-                     + "&sort_by=" + sort_by + "&sort_order=" + sort_order;
-    if (!codec.empty()) path += "&codec=" + codec;
-    if (!from_date.empty()) path += "&from_date=" + from_date;
-    if (!to_date.empty()) path += "&to_date=" + to_date;
-    if (!file_path.empty()) path += "&file_path=" + file_path;
+    // Формируем ключ кеша
+    std::string cache_key = "limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset) 
+                          + "&sort_by=" + sort_by + "&sort_order=" + sort_order
+                          + "&codec=" + codec + "&from_date=" + from_date 
+                          + "&to_date=" + to_date + "&file_path=" + file_path;
     
-    printRequest("GET", path, req_id, "", "");
+    // Проверяем кеш
+    std::string cached_response;
+    if (m_records_cache.get(cache_key, cached_response)) {
+        std::cout << COLOR_HTTP << "  [CACHE HIT] Returning cached response" << COLOR_RESET << std::endl;
+        res.set_content(cached_response, "application/json");
+        res.status = static_cast<int>(HttpStatus::OK);
+        printResponse(res.status, cached_response.substr(0, 60) + (cached_response.size() > 60 ? "..." : ""));
+        return;
+    }
+    
+    std::cout << COLOR_HTTP << "  [CACHE MISS] Fetching from DB" << COLOR_RESET << std::endl;
+    
+    printRequest("GET", "/api/v1/records?" + cache_key, req_id, "", "");
     LOG_DEBUG("HTTP", "GET all records #" + std::to_string(req_id) + " limit=" + std::to_string(limit) 
               + " offset=" + std::to_string(offset) + " sort_by=" + sort_by + " sort_order=" + sort_order
               + " codec=" + codec + " from=" + from_date + " to=" + to_date + " path=" + file_path);
@@ -299,9 +269,14 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
     if (!to_date.empty()) result["to_date"] = to_date;
     if (!file_path.empty()) result["file_path"] = file_path;
     
-    res.set_content(result.dump(), "application/json");
+    std::string response_str = result.dump();
+    
+    // Сохраняем в кеш
+    m_records_cache.set(cache_key, response_str);
+    
+    res.set_content(response_str, "application/json");
     res.status = static_cast<int>(HttpStatus::OK);
-    printResponse(res.status, result.dump().substr(0, 60) + (result.dump().size() > 60 ? "..." : ""));
+    printResponse(res.status, response_str.substr(0, 60) + (response_str.size() > 60 ? "..." : ""));
     LOG_INFO("HTTP", "Returned " + std::to_string(response.records.size()) + " records (total: " + std::to_string(response.total) + ")");
 }
 
@@ -374,6 +349,9 @@ void http_agent_t::handleDelete(const std::string &id, httplib::Response &res)
     int req_id = ++m_request_id_counter;
     printRequest("DELETE", "/api/v1/records/" + id, req_id, id.substr(0, 8), "");
     LOG_DEBUG("HTTP", "DELETE record: " + id);
+
+    // Инвалидируем кеш после удаления
+    m_records_cache.invalidateAll();
 
     auto promise = std::make_shared<std::promise<msg_delete_record_by_id_response>>();
     auto future = promise->get_future();

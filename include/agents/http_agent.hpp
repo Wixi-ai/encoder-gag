@@ -14,6 +14,7 @@
 #include "../messages.hpp"
 #include "../colors.hpp"
 #include "../utils.hpp"
+#include "../cache.hpp"
 
 class http_agent_t : public so_5::agent_t {
 public:
@@ -41,23 +42,21 @@ private:
     std::string m_host;
     int m_port;
     
-    // Для GET /records (все записи)
+    // Кеш для GET /api/v1/records
+    TimedCache<std::string> m_records_cache;
+    
     std::unordered_map<int, std::shared_ptr<std::promise<msg_get_records_response>>> m_pending_requests;
     std::mutex m_pending_mutex;
     
-    // Для GET /records/{id} (одна запись)
     std::unordered_map<int, std::shared_ptr<std::promise<msg_get_record_by_id_response>>> m_pending_record_requests;
     std::mutex m_pending_record_mutex;
     
-    // Для POST (создание записи)
     std::unordered_map<std::string, std::shared_ptr<std::promise<bool>>> m_pending_creates;
     std::mutex m_creates_mutex;
     
-    // Для DELETE
     std::unordered_map<int, std::shared_ptr<std::promise<msg_delete_record_by_id_response>>> m_pending_delete_requests;
     std::mutex m_pending_delete_mutex;
     
-    // Для ffmpeg
     std::unordered_map<int, std::shared_ptr<std::promise<msg_video_params>>> m_pending_video_requests;
     std::mutex m_pending_video_mutex;
 };
