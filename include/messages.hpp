@@ -64,3 +64,47 @@ struct msg_delete_record_by_id_response {
     bool success;
     std::string error_message;
 };
+
+// Запрос на обработку видео (от HTTP агента к ffmpeg_pool)
+struct msg_process_video {
+    std::string record_id;
+    std::string file_path;
+    int request_id;
+    so_5::mbox_t reply_to;
+};
+
+// Ответ от ffmpeg_pool (параметры видео)
+struct msg_video_params {
+    int request_id;
+    bool success;
+    std::string record_id;
+    std::string codec;
+    int width;
+    int height;
+    double duration;
+    std::string error_message;
+};
+
+// VAA блок (видео-аудио ассет)
+struct VaaBlock {
+    int index;
+    std::string type;      // "video", "audio"
+    int64_t pts;           // временная метка
+    int64_t duration;      // длительность
+    std::string data;      // данные (заглушка)
+};
+
+// Сообщение для создания VAA блоков
+struct msg_create_vaa_blocks {
+    std::string record_id;
+    std::vector<VaaBlock> blocks;
+    int request_id;
+    so_5::mbox_t reply_to;
+};
+
+// Ответ о создании VAA блоков
+struct msg_vaa_blocks_response {
+    int request_id;
+    bool success;
+    std::string error_message;
+};
