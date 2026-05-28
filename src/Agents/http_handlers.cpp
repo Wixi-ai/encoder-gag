@@ -219,7 +219,7 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
     if (m_records_cache.get(cache_key, cached_response)) {
         std::cout << COLOR_HTTP << "  [CACHE HIT] Returning cached response" << COLOR_RESET << std::endl;
         res.set_content(cached_response, "application/json");
-        res.status = static_cast<int>(HttpStatus::OK);
+        res.status = static_cast<int>(HttpStatus::NO_CONTENT);
         printResponse(res.status, cached_response.substr(0, 60) + (cached_response.size() > 60 ? "..." : ""));
         return;
     }
@@ -275,7 +275,7 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
     m_records_cache.set(cache_key, response_str);
     
     res.set_content(response_str, "application/json");
-    res.status = static_cast<int>(HttpStatus::OK);
+    res.status = static_cast<int>(HttpStatus::NO_CONTENT);
     printResponse(res.status, response_str.substr(0, 60) + (response_str.size() > 60 ? "..." : ""));
     LOG_INFO("HTTP", "Returned " + std::to_string(response.records.size()) + " records (total: " + std::to_string(response.total) + ")");
 }
@@ -322,7 +322,7 @@ void http_agent_t::handleGetById(const std::string &id, httplib::Response &res)
     {
         json j = {{"id", response.id}, {"file_path", response.file_path}, {"created_at", response.created_at}};
         res.set_content(j.dump(), "application/json");
-        res.status = static_cast<int>(HttpStatus::OK);
+        res.status = static_cast<int>(HttpStatus::NO_CONTENT);
         printResponse(res.status, j.dump());
         LOG_INFO("HTTP", "Record found: " + id);
     }
@@ -379,7 +379,7 @@ void http_agent_t::handleDelete(const std::string &id, httplib::Response &res)
     if (response.success)
     {
         res.set_content("{\"status\": \"deleted\", \"id\": \"" + id + "\"}", "application/json");
-        res.status = static_cast<int>(HttpStatus::OK);
+        res.status = static_cast<int>(HttpStatus::NO_CONTENT);
         printResponse(res.status, "{\"status\": \"deleted\"}");
         LOG_INFO("HTTP", "Record deleted: " + id);
     }
