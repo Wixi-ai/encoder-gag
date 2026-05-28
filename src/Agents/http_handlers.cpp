@@ -1,3 +1,4 @@
+#include <filesystem>
 #include "../../include/agents/http_agent.hpp"
 #include "../../include/colors.hpp"
 #include "../../include/utils.hpp"
