@@ -11,7 +11,7 @@ public:
     Database(const std::string& path);
     ~Database();
 
-    bool saveRecord(const std::string& id, const std::string& file_path);
+    bool saveRecord(const std::string& id, const std::string& file_path, const std::string& codec);
     std::vector<std::pair<std::string, std::string>> getAllRecords(int limit, int offset, const std::string& sort_by, const std::string& sort_order);
     int getTotalRecordsCount();
     int getFilteredCount(const std::string& codec, const std::string& from_date, const std::string& to_date, const std::string& file_path);

@@ -15,7 +15,20 @@ void db_agent_t::so_define_agent() {
         std::cout << COLOR_DB << "  path: " << msg.file_path << COLOR_RESET << std::endl;
         std::cout << COLOR_DB << "  body: " << msg.request_body << COLOR_RESET << std::endl;
 
-        bool success = m_db.saveRecord(msg.id, msg.file_path);
+        // Парсим codec из streams
+        std::string codec = "h264";  // значение по умолчанию
+        try {
+            json j = json::parse(msg.request_body);
+            if (j.contains("streams") && j["streams"].is_array() && !j["streams"].empty()) {
+                if (j["streams"][0].contains("codec")) {
+                    codec = j["streams"][0]["codec"].get<std::string>();
+                }
+            }
+        } catch (...) {
+            // Если не удалось распарсить — оставляем значение по умолчанию
+        }
+        
+        bool success = m_db.saveRecord(msg.id, msg.file_path, codec);
         
         msg_create_response response;
         response.id = msg.id;
