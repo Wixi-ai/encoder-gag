@@ -15,8 +15,14 @@ using json = nlohmann::json;
 
 std::chrono::steady_clock::time_point start_time;
 
-http_agent_t::http_agent_t(context_t ctx, so_5::mbox_t db_mbox, const std::string &host, int port)
-    : so_5::agent_t{std::move(ctx)}, m_db_mbox{std::move(db_mbox)}, m_request_counter(0), m_request_id_counter(0), m_host(host), m_port(port)
+http_agent_t::http_agent_t(context_t ctx, so_5::mbox_t db_mbox, so_5::mbox_t ffmpeg_mbox, const std::string &host, int port)
+    : so_5::agent_t{std::move(ctx)}
+    , m_db_mbox{std::move(db_mbox)}
+    , m_ffmpeg_mbox{std::move(ffmpeg_mbox)}
+    , m_request_counter(0)
+    , m_request_id_counter(0)
+    , m_host(host)
+    , m_port(port)
 {
     LOG_INFO("HTTP", "HTTP Agent created with host=" + host + " port=" + std::to_string(port));
 }
@@ -27,6 +33,7 @@ void http_agent_t::so_evt_start()
     printStartupInfo();
     LOG_INFO("HTTP", "Starting HTTP server on " + m_host + ":" + std::to_string(m_port));
 
+    // Подписки на ответы
     so_subscribe_self().event([this](const msg_create_response &response)
                               {
         auto it = m_pending_creates.find(response.id);
@@ -61,6 +68,23 @@ void http_agent_t::so_evt_start()
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_delete_mutex);
             m_pending_delete_requests.erase(it);
+        } });
+        
+    so_subscribe_self().event([this](const msg_video_params &response)
+                              {
+        auto it = m_pending_video_requests.find(response.request_id);
+        if (it != m_pending_video_requests.end()) {
+            it->second->set_value(response);
+            std::lock_guard<std::mutex> lock(m_pending_video_mutex);
+            m_pending_video_requests.erase(it);
+        } });
+        
+    so_subscribe_self().event([this](const msg_vaa_blocks_response &response)
+                              {
+        std::cout << COLOR_MAGENTA << "[" << current_time() << "] [HTTP] VAA blocks response: " 
+                  << (response.success ? "success" : "failed") << COLOR_RESET << std::endl;
+        if (!response.success) {
+            LOG_ERROR("HTTP", "Failed to create VAA blocks: " + response.error_message);
         } });
 
     m_server = std::make_unique<httplib::Server>();

@@ -17,23 +17,22 @@
 
 class http_agent_t : public so_5::agent_t {
 public:
-    http_agent_t(context_t ctx, so_5::mbox_t db_mbox, const std::string& host = "localhost", int port = 8080);
+    http_agent_t(context_t ctx, so_5::mbox_t db_mbox, so_5::mbox_t ffmpeg_mbox, const std::string& host = "localhost", int port = 8080);
     void so_evt_start() override;
     void so_evt_finish() override;
 
 private:
-    // Обработчики маршрутов
     void handlePost(const httplib::Request& req, httplib::Response& res);
     void handleGetAll(const httplib::Request& req, httplib::Response& res);
     void handleGetById(const std::string& id, httplib::Response& res);
     void handleDelete(const std::string& id, httplib::Response& res);
     
-    // Функции вывода
     void printStartupInfo();
     void printRequest(const std::string& method, const std::string& path, int num, const std::string& id, const std::string& body);
     void printResponse(int status, const std::string& body);
 
     so_5::mbox_t m_db_mbox;
+    so_5::mbox_t m_ffmpeg_mbox;
     std::unique_ptr<httplib::Server> m_server;
     std::thread m_server_thread;
     int m_request_counter;
@@ -42,15 +41,23 @@ private:
     std::string m_host;
     int m_port;
     
+    // Для GET /records (все записи)
     std::unordered_map<int, std::shared_ptr<std::promise<msg_get_records_response>>> m_pending_requests;
     std::mutex m_pending_mutex;
     
+    // Для GET /records/{id} (одна запись)
     std::unordered_map<int, std::shared_ptr<std::promise<msg_get_record_by_id_response>>> m_pending_record_requests;
     std::mutex m_pending_record_mutex;
     
+    // Для POST (создание записи)
     std::unordered_map<std::string, std::shared_ptr<std::promise<bool>>> m_pending_creates;
     std::mutex m_creates_mutex;
     
+    // Для DELETE
     std::unordered_map<int, std::shared_ptr<std::promise<msg_delete_record_by_id_response>>> m_pending_delete_requests;
     std::mutex m_pending_delete_mutex;
+    
+    // Для ffmpeg
+    std::unordered_map<int, std::shared_ptr<std::promise<msg_video_params>>> m_pending_video_requests;
+    std::mutex m_pending_video_mutex;
 };

@@ -1,4 +1,7 @@
 #include "../../include/agents/db_agent.hpp"
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 db_agent_t::db_agent_t(context_t ctx, const std::string& db_path)
     : so_5::agent_t{std::move(ctx)}

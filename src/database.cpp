@@ -22,7 +22,7 @@ void Database::createTables() {
         CREATE TABLE IF NOT EXISTS records (
             id TEXT PRIMARY KEY,
             file_path TEXT NOT NULL,
-            codec TEXT,
+            codec TEXT DEFAULT 'h264',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     )";
@@ -35,7 +35,7 @@ void Database::createTables() {
     }
 }
 
-bool Database::saveRecord(const std::string& id, const std::string& file_path) {
+bool Database::saveRecord(const std::string& id, const std::string& file_path, const std::string& codec) {
     const char* sql = "INSERT INTO records (id, file_path, codec) VALUES (?, ?, ?);";
     sqlite3_stmt* stmt;
     
@@ -46,8 +46,7 @@ bool Database::saveRecord(const std::string& id, const std::string& file_path) {
     
     sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, file_path.c_str(), -1, SQLITE_STATIC);
-    // Временно без codec
-    sqlite3_bind_text(stmt, 3, "h264", -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, codec.c_str(), -1, SQLITE_STATIC);
     
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -61,7 +60,7 @@ bool Database::saveRecord(const std::string& id, const std::string& file_path) {
         return false;
     }
     
-    std::cout << COLOR_DB_COM << "[Database] Record saved: " << id << COLOR_RESET << std::endl;
+    std::cout << COLOR_DB_COM << "[Database] Record saved: " << id << " codec: " << codec << COLOR_RESET << std::endl;
     return true;
 }
 

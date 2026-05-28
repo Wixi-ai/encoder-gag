@@ -111,6 +111,49 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
         printRequest("POST", "/api/v1/records", m_request_counter, id.substr(0, 8), req.body);
         LOG_INFO("HTTP", "POST #" + std::to_string(m_request_counter) + " id=" + id + " path=" + file_path);
 
+        // Сначала отправляем видео на обработку в ffmpeg_pool
+        auto video_promise = std::make_shared<std::promise<msg_video_params>>();
+        auto video_future = video_promise->get_future();
+        {
+            std::lock_guard<std::mutex> lock(m_pending_video_mutex);
+            m_pending_video_requests[m_request_counter] = video_promise;
+        }
+        
+        msg_process_video video_msg;
+        video_msg.record_id = id;
+        video_msg.file_path = file_path;
+        video_msg.request_id = m_request_counter;
+        video_msg.reply_to = so_direct_mbox();
+        so_5::send<msg_process_video>(m_ffmpeg_mbox, video_msg);
+        
+        std::cout << COLOR_HTTP << "  -> FFmpeg Agent | sent for processing" << COLOR_RESET << std::endl;
+        
+        // Ждём результат от ffmpeg
+        if (video_future.wait_for(std::chrono::seconds(config::TIMEOUT_SECONDS)) != std::future_status::ready)
+        {
+            std::cout << COLOR_RED << "  [ERROR] Timeout waiting for ffmpeg response" << COLOR_RESET << std::endl;
+            res.set_content("{\"error\": \"video processing timeout\"}", "application/json");
+            res.status = static_cast<int>(HttpStatus::GATEWAY_TIMEOUT);
+            printResponse(res.status, "{\"error\": \"video processing timeout\"}");
+            LOG_ERROR("HTTP", "Timeout waiting for ffmpeg for id=" + id);
+            return;
+        }
+        
+        auto video_params = video_future.get();
+        if (!video_params.success)
+        {
+            std::cout << COLOR_RED << "  [ERROR] Video processing failed" << COLOR_RESET << std::endl;
+            res.set_content("{\"error\": \"video processing failed\"}", "application/json");
+            res.status = static_cast<int>(HttpStatus::INTERNAL_SERVER_ERROR);
+            printResponse(res.status, "{\"error\": \"video processing failed\"}");
+            LOG_ERROR("HTTP", "Video processing failed for id=" + id);
+            return;
+        }
+        
+        std::cout << COLOR_HTTP << "  <- FFmpeg Agent | params: " << video_params.width << "x" << video_params.height 
+                  << " codec=" << video_params.codec << COLOR_RESET << std::endl;
+        
+        // Затем сохраняем в БД
         auto promise = std::make_shared<std::promise<bool>>();
         auto future = promise->get_future();
         {
@@ -130,19 +173,16 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
         if (future.wait_for(std::chrono::seconds(config::TIMEOUT_SECONDS)) != std::future_status::ready)
         {
             std::cout << COLOR_RED << "  [ERROR] Timeout waiting for DB response" << COLOR_RESET << std::endl;
-            res.set_content("{\"error\": \"timeout\"}", "application/json");
+            res.set_content("{\"error\": \"database timeout\"}", "application/json");
             res.status = static_cast<int>(HttpStatus::GATEWAY_TIMEOUT);
-            printResponse(res.status, "{\"error\": \"timeout\"}");
+            printResponse(res.status, "{\"error\": \"database timeout\"}");
             LOG_ERROR("HTTP", "Timeout for id=" + id);
             return;
         }
 
-        bool success = future.get();
-        std::cout << COLOR_HTTP << "  <- DB Agent | success=" << success << COLOR_RESET << std::endl;
-
-        if (success)
+        if (future.get())
         {
-            std::string response = "{\"status\": \"created\", \"id\": \"" + id + "\", \"file_path\": \"" + file_path + "\"}";
+            std::string response = "{\"status\": \"created\", \"id\": \"" + id + "\", \"file_path\": \"" + file_path + "\", \"video_params\": {\"codec\": \"" + video_params.codec + "\", \"width\": " + std::to_string(video_params.width) + ", \"height\": " + std::to_string(video_params.height) + "}}";
             res.set_content(response, "application/json");
             res.status = static_cast<int>(HttpStatus::CREATED);
             printResponse(res.status, response);
@@ -172,7 +212,6 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
     std::string sort_by = "created_at";
     std::string sort_order = "asc";
     
-    // Параметры фильтрации
     std::string codec = "";
     std::string from_date = "";
     std::string to_date = "";
@@ -202,7 +241,6 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
             sort_order = "asc";
     }
     
-    // Парсим фильтры
     if (req.has_param("codec")) codec = req.get_param_value("codec");
     if (req.has_param("from_date")) from_date = req.get_param_value("from_date");
     if (req.has_param("to_date")) to_date = req.get_param_value("to_date");
@@ -255,7 +293,6 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
         {"records", j}
     };
     
-    // Добавляем фильтры в ответ если они были использованы
     if (!codec.empty()) result["codec"] = codec;
     if (!from_date.empty()) result["from_date"] = from_date;
     if (!to_date.empty()) result["to_date"] = to_date;

@@ -1,6 +1,7 @@
 #include <so_5/all.hpp>
 #include "../include/agents/db_agent.hpp"
 #include "../include/agents/http_agent.hpp"
+#include "../include/agents/ffmpeg_agent.hpp"
 #include "../include/colors.hpp"
 #include "../include/logger.hpp"
 #include <thread>
@@ -43,6 +44,7 @@ int main() {
     std::cout << COLOR_MAIN << "  ENCODERS_GAG v1.0 STARTING" << COLOR_RESET << std::endl;
     std::cout << COLOR_MAIN << "  Host: " << host << " Port: " << port << COLOR_RESET << std::endl;
     std::cout << COLOR_MAIN << "  Database: " << db_path << COLOR_RESET << std::endl;
+    std::cout << COLOR_MAIN << "  FFmpeg Agent: ENABLED" << COLOR_RESET << std::endl;
     std::cout << COLOR_MAIN << "========================================" << COLOR_RESET << std::endl;
     
     so_5::launch([&](so_5::environment_t& env) {
@@ -51,9 +53,13 @@ int main() {
         auto db_mbox = env.introduce_coop([&](so_5::coop_t& coop) {
             return coop.make_agent<db_agent_t>(db_path)->so_direct_mbox();
         });
+        
+        auto ffmpeg_mbox = env.introduce_coop([&](so_5::coop_t& coop) {
+            return coop.make_agent<ffmpeg_agent_t>(db_mbox)->so_direct_mbox();
+        });
 
         env.introduce_coop([&](so_5::coop_t& coop) {
-            coop.make_agent<http_agent_t>(db_mbox, host, port);
+            coop.make_agent<http_agent_t>(db_mbox, ffmpeg_mbox, host, port);
         });
 
         while (g_running) {

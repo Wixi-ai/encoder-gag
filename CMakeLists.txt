@@ -31,6 +31,7 @@ add_executable(${PROJECT_NAME}
     src/agents/http_agent.cpp
     src/agents/http_handlers.cpp
     src/agents/http_print.cpp
+    src/agents/ffmpeg_agent.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
