@@ -5,7 +5,7 @@
 #include "../../include/constants.hpp"
 #include <nlohmann/json.hpp>
 #include <chrono>
-#include <filesystem>
+#include <tuple>
 
 using json = nlohmann::json;
 
@@ -254,7 +254,7 @@ void http_agent_t::handleGetAll(const httplib::Request &req, httplib::Response &
     auto response = future.get();
     json j = json::array();
     for (const auto& rec : response.records) {
-        j.push_back({{"id", rec.first}, {"file_path", rec.second}});
+        j.push_back({{"id", std::get<0>(rec)}, {"start", std::get<1>(rec)}, {"finish", std::get<2>(rec)}});
     }
     
     json result = {

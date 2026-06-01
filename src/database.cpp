@@ -34,7 +34,7 @@ void Database::createTables() {
             stream_id INTEGER NOT NULL,
             stream_type TEXT NOT NULL,
             begin_time TEXT NOT NULL,
-            file_path TEXT NOT NULL,
+            file_path TEXT,
             FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
         );
     )";
@@ -252,4 +252,29 @@ bool Database::deleteRecordById(const std::string& id) {
     
     std::cout << COLOR_DB_COM << "[Database] Record not found: " << id << COLOR_RESET << std::endl;
     return false;
+}
+
+std::pair<std::string, std::string> Database::getRecordTimeRange(const std::string& record_id) {
+    const char* sql = "SELECT MIN(begin_time), MAX(begin_time) FROM record_files WHERE record_id = ?;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << COLOR_DB_COM << "[Database] Time range error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        return {"", ""};
+    }
+    
+    sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
+    
+    std::string start = "";
+    std::string finish = "";
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* min_time = (const char*)sqlite3_column_text(stmt, 0);
+        const char* max_time = (const char*)sqlite3_column_text(stmt, 1);
+        if (min_time) start = min_time;
+        if (max_time) finish = max_time;
+    }
+    
+    sqlite3_finalize(stmt);
+    return {start, finish};
 }

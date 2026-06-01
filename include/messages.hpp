@@ -60,7 +60,7 @@ struct msg_get_records_response {
     int total;
     int limit;
     int offset;
-    std::vector<std::pair<std::string, std::string>> records;
+    std::vector<std::tuple<std::string, std::string, std::string>> records;
 };
 
 struct msg_get_record_by_id {

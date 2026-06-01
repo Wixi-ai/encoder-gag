@@ -17,7 +17,6 @@ void db_agent_t::so_define_agent() {
         std::cout << COLOR_DB << "  id:   " << msg.id << COLOR_RESET << std::endl;
         std::cout << COLOR_DB << "  streams count: " << msg.streams.size() << COLOR_RESET << std::endl;
 
-        // Преобразуем msg в RecordCreateRequest
         RecordCreateRequest request;
         request.id = msg.id;
         request.block_size = msg.block_size;
@@ -58,7 +57,12 @@ void db_agent_t::so_define_agent() {
         response.total = total;
         response.limit = msg.limit;
         response.offset = msg.offset;
-        response.records = records;
+        
+        for (const auto& rec : records) {
+            auto [start, finish] = m_db.getRecordTimeRange(rec.first);
+            response.records.emplace_back(rec.first, start, finish);
+        }
+        
         so_5::send<msg_get_records_response>(msg.reply_to, response);
     });
     
