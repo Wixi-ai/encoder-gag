@@ -317,7 +317,37 @@ void http_agent_t::handleGetById(const std::string &id, httplib::Response &res)
 
     auto response = future.get();
     if (response.found) {
-        json j = {{"id", response.id}, {"file_path", response.file_path}, {"created_at", response.created_at}};
+        json j;
+        j["id"] = response.id;
+        j["created_at"] = response.created_at;
+        
+        json video_array = json::array();
+        for (const auto& v : response.video) {
+            json vj;
+            vj["id"] = v.id;
+            vj["codec"] = v.codec;
+            vj["width"] = v.width;
+            vj["height"] = v.height;
+            vj["time_base"] = {{"num", v.time_base.num}, {"den", v.time_base.den}};
+            vj["extra"] = v.extra;
+            video_array.push_back(vj);
+        }
+        j["video"] = video_array;
+        
+        json audio_array = json::array();
+        for (const auto& a : response.audio) {
+            json aj;
+            aj["id"] = a.id;
+            aj["codec"] = a.codec;
+            aj["sample_rate"] = a.sample_rate;
+            aj["channels"] = a.channels;
+            aj["channel_layout"] = a.channel_layout;
+            aj["time_base"] = {{"num", a.time_base.num}, {"den", a.time_base.den}};
+            aj["extra"] = a.extra;
+            audio_array.push_back(aj);
+        }
+        j["audio"] = audio_array;
+        
         res.set_content(j.dump(), "application/json");
         res.status = static_cast<int>(HttpStatus::OK);
         printResponse(res.status, j.dump());

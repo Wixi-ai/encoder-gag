@@ -9,21 +9,40 @@ struct TimeBase {
     int den;
 };
 
+struct VideoStream {
+    int id;
+    std::string codec;
+    int width;
+    int height;
+    TimeBase time_base;
+    std::string extra;
+};
+
+struct AudioStream {
+    int id;
+    std::string codec;
+    int sample_rate;
+    int channels;
+    std::string channel_layout;
+    TimeBase time_base;
+    std::string extra;
+};
+
 struct FileInfo {
-    std::string begin;   // ISO 8601 timestamp
-    std::string path;    // путь к файлу
+    std::string begin;
+    std::string path;
 };
 
 struct Stream {
-    std::string type;           // "video" или "audio"
+    std::string type;
     int id;
     std::vector<FileInfo> files;
 };
 
 struct RecordCreateRequest {
-    std::string id;              // UUID
+    std::string id;
     int block_size;
-    int fblock;                  // integer по ТЗ
+    int fblock;
     std::vector<Stream> streams;
 };
 
@@ -73,7 +92,8 @@ struct msg_get_record_by_id_response {
     int request_id;
     bool found;
     std::string id;
-    std::string file_path;
+    std::vector<VideoStream> video;
+    std::vector<AudioStream> audio;
     std::string created_at;
 };
 
@@ -89,7 +109,7 @@ struct msg_delete_record_by_id_response {
     std::string error_message;
 };
 
-// Временные сообщения для ffmpeg (оставляем как есть)
+// Временные сообщения для ffmpeg
 struct msg_process_video {
     std::string record_id;
     std::string file_path;

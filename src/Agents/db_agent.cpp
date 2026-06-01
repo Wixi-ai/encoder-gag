@@ -75,8 +75,12 @@ void db_agent_t::so_define_agent() {
         response.request_id = msg.request_id;
         response.found = found;
         response.id = id;
-        response.file_path = path;
         response.created_at = created;
+        if (found) {
+            auto [video, audio] = m_db.getStreamsByRecordId(id);
+            response.video = video;
+            response.audio = audio;
+        }
         so_5::send<msg_get_record_by_id_response>(msg.reply_to, response);
         
         if (found) {

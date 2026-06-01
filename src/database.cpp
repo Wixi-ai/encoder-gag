@@ -34,7 +34,7 @@ void Database::createTables() {
             stream_id INTEGER NOT NULL,
             stream_type TEXT NOT NULL,
             begin_time TEXT NOT NULL,
-            file_path TEXT,
+            file_path TEXT NOT NULL,
             FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
         );
     )";
@@ -48,7 +48,6 @@ void Database::createTables() {
 }
 
 bool Database::saveRecord(const RecordCreateRequest& request) {
-    // Сохраняем основную запись
     const char* record_sql = "INSERT INTO records (id, block_size, fblock, codec) VALUES (?, ?, ?, ?);";
     sqlite3_stmt* stmt;
     
@@ -60,7 +59,7 @@ bool Database::saveRecord(const RecordCreateRequest& request) {
     sqlite3_bind_text(stmt, 1, request.id.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_int(stmt, 2, request.block_size);
     sqlite3_bind_int(stmt, 3, request.fblock);
-    sqlite3_bind_text(stmt, 4, "h264", -1, SQLITE_STATIC); // временно
+    sqlite3_bind_text(stmt, 4, "h264", -1, SQLITE_STATIC);
     
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -74,7 +73,6 @@ bool Database::saveRecord(const RecordCreateRequest& request) {
         return false;
     }
     
-    // Сохраняем файлы из streams
     const char* file_sql = "INSERT INTO record_files (record_id, stream_id, stream_type, begin_time, file_path) VALUES (?, ?, ?, ?, ?);";
     
     for (const auto& stream : request.streams) {
@@ -201,6 +199,31 @@ std::vector<std::pair<std::string, std::string>> Database::getAllRecords(int lim
     return getFilteredRecords(limit, offset, sort_by, sort_order, "", "", "", "");
 }
 
+std::pair<std::string, std::string> Database::getRecordTimeRange(const std::string& record_id) {
+    const char* sql = "SELECT MIN(begin_time), MAX(begin_time) FROM record_files WHERE record_id = ?;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << COLOR_DB_COM << "[Database] Time range error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        return {"", ""};
+    }
+    
+    sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
+    
+    std::string start = "";
+    std::string finish = "";
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* min_time = (const char*)sqlite3_column_text(stmt, 0);
+        const char* max_time = (const char*)sqlite3_column_text(stmt, 1);
+        if (min_time) start = min_time;
+        if (max_time) finish = max_time;
+    }
+    
+    sqlite3_finalize(stmt);
+    return {start, finish};
+}
+
 std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(const std::string& id) const {
     const char* sql = "SELECT id, file_path, created_at FROM records WHERE id = ?;";
     sqlite3_stmt* stmt;
@@ -225,7 +248,6 @@ std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(
 }
 
 bool Database::deleteRecordById(const std::string& id) {
-    // Каскадное удаление настроено через FOREIGN KEY, но для страховки удалим файлы явно
     const char* delete_files_sql = "DELETE FROM record_files WHERE record_id = ?;";
     sqlite3_stmt* stmt;
     
@@ -254,27 +276,29 @@ bool Database::deleteRecordById(const std::string& id) {
     return false;
 }
 
-std::pair<std::string, std::string> Database::getRecordTimeRange(const std::string& record_id) {
-    const char* sql = "SELECT MIN(begin_time), MAX(begin_time) FROM record_files WHERE record_id = ?;";
-    sqlite3_stmt* stmt;
+std::tuple<std::vector<VideoStream>, std::vector<AudioStream>> Database::getStreamsByRecordId(const std::string&) {
+    std::vector<VideoStream> video;
+    std::vector<AudioStream> audio;
     
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        std::cerr << COLOR_DB_COM << "[Database] Time range error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
-        return {"", ""};
-    }
+    // Временно заглушка: возвращаем тестовые данные
+    VideoStream v;
+    v.id = 0;
+    v.codec = "h264";
+    v.width = 1920;
+    v.height = 1080;
+    v.time_base = {1, 90000};
+    v.extra = "";
+    video.push_back(v);
     
-    sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
+    AudioStream a;
+    a.id = 1;
+    a.codec = "aac";
+    a.sample_rate = 48000;
+    a.channels = 2;
+    a.channel_layout = "stereo";
+    a.time_base = {1, 48000};
+    a.extra = "";
+    audio.push_back(a);
     
-    std::string start = "";
-    std::string finish = "";
-    
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char* min_time = (const char*)sqlite3_column_text(stmt, 0);
-        const char* max_time = (const char*)sqlite3_column_text(stmt, 1);
-        if (min_time) start = min_time;
-        if (max_time) finish = max_time;
-    }
-    
-    sqlite3_finalize(stmt);
-    return {start, finish};
+    return {video, audio};
 }
