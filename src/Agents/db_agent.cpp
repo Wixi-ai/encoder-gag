@@ -15,23 +15,16 @@ void db_agent_t::so_define_agent() {
         m_create_counter++;
         std::cout << COLOR_DB << "[" << current_time() << "] [DB] CREATE #" << m_create_counter << COLOR_RESET << std::endl;
         std::cout << COLOR_DB << "  id:   " << msg.id << COLOR_RESET << std::endl;
-        std::cout << COLOR_DB << "  path: " << msg.file_path << COLOR_RESET << std::endl;
-        std::cout << COLOR_DB << "  body: " << msg.request_body << COLOR_RESET << std::endl;
+        std::cout << COLOR_DB << "  streams count: " << msg.streams.size() << COLOR_RESET << std::endl;
 
-        // Парсим codec из streams
-        std::string codec = "h264";  // значение по умолчанию
-        try {
-            json j = json::parse(msg.request_body);
-            if (j.contains("streams") && j["streams"].is_array() && !j["streams"].empty()) {
-                if (j["streams"][0].contains("codec")) {
-                    codec = j["streams"][0]["codec"].get<std::string>();
-                }
-            }
-        } catch (...) {
-            // Если не удалось распарсить — оставляем значение по умолчанию
-        }
+        // Преобразуем msg в RecordCreateRequest
+        RecordCreateRequest request;
+        request.id = msg.id;
+        request.block_size = msg.block_size;
+        request.fblock = msg.fblock;
+        request.streams = msg.streams;
         
-        bool success = m_db.saveRecord(msg.id, msg.file_path, codec);
+        bool success = m_db.saveRecord(request);
         
         msg_create_response response;
         response.id = msg.id;

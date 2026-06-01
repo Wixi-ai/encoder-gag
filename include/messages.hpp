@@ -4,10 +4,35 @@
 #include <vector>
 #include <so_5/all.hpp>
 
+struct TimeBase {
+    int num;
+    int den;
+};
+
+struct FileInfo {
+    std::string begin;   // ISO 8601 timestamp
+    std::string path;    // путь к файлу
+};
+
+struct Stream {
+    std::string type;           // "video" или "audio"
+    int id;
+    std::vector<FileInfo> files;
+};
+
+struct RecordCreateRequest {
+    std::string id;              // UUID
+    int block_size;
+    int fblock;                  // integer по ТЗ
+    std::vector<Stream> streams;
+};
+
+// Сообщения для акторов
 struct msg_create_record {
     std::string id;
-    std::string file_path;
-    std::string request_body;
+    std::vector<Stream> streams;
+    int block_size;
+    int fblock;
     so_5::mbox_t reply_to;
 };
 
@@ -23,11 +48,10 @@ struct msg_get_records {
     int offset;
     std::string sort_by;
     std::string sort_order;
-    // Фильтры
-    std::string codec;      // фильтр по кодекам
-    std::string from_date;  // записи после даты (YYYY-MM-DD)
-    std::string to_date;    // записи до даты (YYYY-MM-DD)
-    std::string file_path;  // фильтр по пути (частичное совпадение)
+    std::string codec;
+    std::string from_date;
+    std::string to_date;
+    std::string file_path;
     so_5::mbox_t reply_to;
 };
 
@@ -65,7 +89,7 @@ struct msg_delete_record_by_id_response {
     std::string error_message;
 };
 
-// Запрос на обработку видео (от HTTP агента к ffmpeg_pool)
+// Временные сообщения для ffmpeg (оставляем как есть)
 struct msg_process_video {
     std::string record_id;
     std::string file_path;
@@ -73,7 +97,6 @@ struct msg_process_video {
     so_5::mbox_t reply_to;
 };
 
-// Ответ от ffmpeg_pool (параметры видео)
 struct msg_video_params {
     int request_id;
     bool success;
@@ -85,16 +108,14 @@ struct msg_video_params {
     std::string error_message;
 };
 
-// VAA блок (видео-аудио ассет)
 struct VaaBlock {
     int index;
-    std::string type;      // "video", "audio"
-    int64_t pts;           // временная метка
-    int64_t duration;      // длительность
-    std::string data;      // данные (заглушка)
+    std::string type;
+    int64_t pts;
+    int64_t duration;
+    std::string data;
 };
 
-// Сообщение для создания VAA блоков
 struct msg_create_vaa_blocks {
     std::string record_id;
     std::vector<VaaBlock> blocks;
@@ -102,7 +123,6 @@ struct msg_create_vaa_blocks {
     so_5::mbox_t reply_to;
 };
 
-// Ответ о создании VAA блоков
 struct msg_vaa_blocks_response {
     int request_id;
     bool success;

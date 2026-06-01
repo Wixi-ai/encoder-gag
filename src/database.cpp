@@ -21,9 +21,21 @@ void Database::createTables() {
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS records (
             id TEXT PRIMARY KEY,
-            file_path TEXT NOT NULL,
+            file_path TEXT,
             codec TEXT DEFAULT 'h264',
+            block_size INTEGER DEFAULT 0,
+            fblock INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS record_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id TEXT NOT NULL,
+            stream_id INTEGER NOT NULL,
+            stream_type TEXT NOT NULL,
+            begin_time TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
         );
     )";
     char* errMsg = nullptr;
@@ -31,36 +43,63 @@ void Database::createTables() {
         std::cerr << COLOR_DB_COM << "[Database] Error creating table: " << errMsg << COLOR_RESET << std::endl;
         sqlite3_free(errMsg);
     } else {
-        std::cout << COLOR_DB_COM << "[Database] Table 'records' ready" << COLOR_RESET << std::endl;
+        std::cout << COLOR_DB_COM << "[Database] Tables created" << COLOR_RESET << std::endl;
     }
 }
 
-bool Database::saveRecord(const std::string& id, const std::string& file_path, const std::string& codec) {
-    const char* sql = "INSERT INTO records (id, file_path, codec) VALUES (?, ?, ?);";
+bool Database::saveRecord(const RecordCreateRequest& request) {
+    // Сохраняем основную запись
+    const char* record_sql = "INSERT INTO records (id, block_size, fblock, codec) VALUES (?, ?, ?, ?);";
     sqlite3_stmt* stmt;
     
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, record_sql, -1, &stmt, nullptr) != SQLITE_OK) {
         std::cerr << COLOR_DB_COM << "[Database] Prepare error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
         return false;
     }
     
-    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, file_path.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, codec.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, request.id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, request.block_size);
+    sqlite3_bind_int(stmt, 3, request.fblock);
+    sqlite3_bind_text(stmt, 4, "h264", -1, SQLITE_STATIC); // временно
     
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     
-    if (rc == SQLITE_CONSTRAINT) {
-        std::cerr << COLOR_DB_COM << "[Database] Record already exists: " << id << COLOR_RESET << std::endl;
-        return false;
-    }
     if (rc != SQLITE_DONE) {
-        std::cerr << COLOR_DB_COM << "[Database] Insert error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        if (rc == SQLITE_CONSTRAINT) {
+            std::cerr << COLOR_DB_COM << "[Database] Record already exists: " << request.id << COLOR_RESET << std::endl;
+        } else {
+            std::cerr << COLOR_DB_COM << "[Database] Insert error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+        }
         return false;
     }
     
-    std::cout << COLOR_DB_COM << "[Database] Record saved: " << id << " codec: " << codec << COLOR_RESET << std::endl;
+    // Сохраняем файлы из streams
+    const char* file_sql = "INSERT INTO record_files (record_id, stream_id, stream_type, begin_time, file_path) VALUES (?, ?, ?, ?, ?);";
+    
+    for (const auto& stream : request.streams) {
+        for (const auto& file : stream.files) {
+            if (sqlite3_prepare_v2(db, file_sql, -1, &stmt, nullptr) != SQLITE_OK) {
+                std::cerr << COLOR_DB_COM << "[Database] Prepare file error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+                continue;
+            }
+            
+            sqlite3_bind_text(stmt, 1, request.id.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_int(stmt, 2, stream.id);
+            sqlite3_bind_text(stmt, 3, stream.type.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 4, file.begin.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 5, file.path.c_str(), -1, SQLITE_STATIC);
+            
+            rc = sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+            
+            if (rc != SQLITE_DONE) {
+                std::cerr << COLOR_DB_COM << "[Database] File insert error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
+            }
+        }
+    }
+    
+    std::cout << COLOR_DB_COM << "[Database] Record saved: " << request.id << COLOR_RESET << std::endl;
     return true;
 }
 
@@ -77,7 +116,7 @@ int Database::getFilteredCount(const std::string& codec, const std::string& from
         sql += " AND date(created_at) <= '" + to_date + "'";
     }
     if (!file_path.empty()) {
-        sql += " AND file_path LIKE '%" + file_path + "%'";
+        sql += " AND EXISTS (SELECT 1 FROM record_files WHERE record_files.record_id = records.id AND record_files.file_path LIKE '%" + file_path + "%')";
     }
     
     sqlite3_stmt* stmt;
@@ -117,7 +156,7 @@ std::vector<std::pair<std::string, std::string>> Database::getFilteredRecords(in
         sql += " AND date(created_at) <= '" + to_date + "'";
     }
     if (!file_path.empty()) {
-        sql += " AND file_path LIKE '%" + file_path + "%'";
+        sql += " AND EXISTS (SELECT 1 FROM record_files WHERE record_files.record_id = records.id AND record_files.file_path LIKE '%" + file_path + "%')";
     }
     
     sql += " ORDER BY " + valid_sort_by + " " + valid_sort_order + " LIMIT ? OFFSET ?;";
@@ -134,7 +173,7 @@ std::vector<std::pair<std::string, std::string>> Database::getFilteredRecords(in
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         records.emplace_back(
             (const char*)sqlite3_column_text(stmt, 0),
-            (const char*)sqlite3_column_text(stmt, 1)
+            (const char*)sqlite3_column_text(stmt, 1) ?: ""
         );
     }
     sqlite3_finalize(stmt);
@@ -175,7 +214,7 @@ std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(
     
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         std::string found_id = (const char*)sqlite3_column_text(stmt, 0);
-        std::string path = (const char*)sqlite3_column_text(stmt, 1);
+        std::string path = (const char*)sqlite3_column_text(stmt, 1) ?: "";
         std::string created = (const char*)sqlite3_column_text(stmt, 2);
         sqlite3_finalize(stmt);
         return {true, found_id, path, created};
@@ -186,10 +225,18 @@ std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(
 }
 
 bool Database::deleteRecordById(const std::string& id) {
-    const char* sql = "DELETE FROM records WHERE id = ?;";
+    // Каскадное удаление настроено через FOREIGN KEY, но для страховки удалим файлы явно
+    const char* delete_files_sql = "DELETE FROM record_files WHERE record_id = ?;";
     sqlite3_stmt* stmt;
     
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, delete_files_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    
+    const char* delete_record_sql = "DELETE FROM records WHERE id = ?;";
+    if (sqlite3_prepare_v2(db, delete_record_sql, -1, &stmt, nullptr) != SQLITE_OK) {
         std::cerr << COLOR_DB_COM << "[Database] Delete prepare error: " << sqlite3_errmsg(db) << COLOR_RESET << std::endl;
         return false;
     }
