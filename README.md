@@ -136,9 +136,11 @@ encoder_project/
 │   ├── messages.hpp                  # Структуры сообщений между агентами
 │   ├── logger.hpp                    # Логирование в файл (класс Logger)
 │   ├── constants.hpp                 # Константы: DEFAULT_LIMIT, MAX_LIMIT, TIMEOUT_SECONDS
+│   ├── cache.hpp                     # Кеш для GET запросов
 │   └── agents/                       # Агенты (объявления)
 │       ├── db_agent.hpp              # DB агент — работа с базой данных
-│       └── http_agent.hpp            # HTTP агент — обработка запросов
+│       ├── http_agent.hpp            # HTTP агент — обработка запросов
+│       └── ffmpeg_agent.hpp          # FFmpeg агент — анализ видео и VAA блоки
 │
 ├── src/                              # Реализация (.cpp)
 │   ├── main.cpp                      # Точка входа, инициализация, graceful shutdown
@@ -147,7 +149,8 @@ encoder_project/
 │       ├── db_agent.cpp              # DB агент — сохранение, чтение, удаление записей
 │       ├── http_agent.cpp            # HTTP агент — основная логика (конструктор, подписки)
 │       ├── http_handlers.cpp         # Обработчики маршрутов (POST, GET, DELETE)
-│       └── http_print.cpp            # Функции вывода (баннер, рамки, команды)
+│       ├── http_print.cpp            # Функции вывода (баннер, рамки, команды)
+│       └── ffmpeg_agent.cpp          # FFmpeg агент — реальный анализ видео через ffprobe
 │
 ├── scripts/                          # Bash скрипты для тестирования API
 │   ├── health.sh                     # Проверка здоровья сервера (GET /health)
@@ -164,7 +167,7 @@ encoder_project/
 ├── docker-compose.yml                # Docker Compose для удобного запуска
 │
 ├── CMakeLists.txt                    # Конфигурация сборки CMake
-├── conanfile.txt                     # Зависимости Conan (cpp-httplib, nlohmann_json, sobjectizer, sqlite3)
+├── conanfile.txt                     # Зависимости Conan
 │
 ├── build.sh                          # Скрипт сборки проекта
 ├── rebuild.sh                        # Полная пересборка с нуля

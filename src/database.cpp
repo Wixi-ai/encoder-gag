@@ -60,10 +60,12 @@ void Database::createTables()
         std::cerr << COLOR_DB_COM << "[Database] Error creating table: " << errMsg << COLOR_RESET << std::endl;
         sqlite3_free(errMsg);
     }
-    else
-    {
-        std::cout << COLOR_DB_COM << "[Database] Tables created" << COLOR_RESET << std::endl;
-    }
+    
+    // Индексы для ускорения запросов
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_vaa_blocks_record_id ON vaa_blocks(record_id);", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_record_files_record_id ON record_files(record_id);", nullptr, nullptr, nullptr);
+    
+    std::cout << COLOR_DB_COM << "[Database] Tables and indexes created" << COLOR_RESET << std::endl;
 }
 
 bool Database::saveRecord(const RecordCreateRequest &request)

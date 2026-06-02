@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <tuple>
+#include <cstdio>
 
 using json = nlohmann::json;
 
@@ -146,13 +147,6 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
 
         m_records_cache.invalidateAll();
 
-        auto promise = std::make_shared<std::promise<bool>>();
-        auto future = promise->get_future();
-        {
-            std::lock_guard<std::mutex> lock(m_creates_mutex);
-            m_pending_creates[request.id] = promise;
-        }
-
         // Извлекаем путь к первому видео файлу из запроса
         std::string video_path = "";
         for (const auto& stream : request.streams) {
@@ -165,6 +159,25 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
         if (video_path.empty()) {
             std::cout << COLOR_YELLOW << "  [WARN] No video file found in request" << COLOR_RESET << std::endl;
             video_path = "/default/video.mp4";
+        }
+
+        // ПРОВЕРКА: существует ли видео файл
+        FILE* test_file = fopen(video_path.c_str(), "rb");
+        if (!test_file) {
+            std::cout << COLOR_RED << "  [ERROR] Video file not found: " << video_path << COLOR_RESET << std::endl;
+            res.set_content("{\"error\": \"video file not found: " + video_path + "\"}", "application/json");
+            res.status = static_cast<int>(HttpStatus::BAD_REQUEST);
+            printResponse(res.status, "{\"error\": \"video file not found\"}");
+            LOG_WARN("HTTP", "File not found: " + video_path);
+            return;
+        }
+        fclose(test_file);
+
+        auto promise = std::make_shared<std::promise<bool>>();
+        auto future = promise->get_future();
+        {
+            std::lock_guard<std::mutex> lock(m_creates_mutex);
+            m_pending_creates[request.id] = promise;
         }
 
         // Отправляем видео на анализ в ffmpeg_agent
