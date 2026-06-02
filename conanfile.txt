@@ -1,7 +1,7 @@
 [requires]
-cpp-httplib/0.14.3
+cpp-httplib/0.12.4
 nlohmann_json/3.11.2
-sobjectizer/5.8.1
+sobjectizer/5.7.5
 sqlite3/3.45.1
 
 [generators]

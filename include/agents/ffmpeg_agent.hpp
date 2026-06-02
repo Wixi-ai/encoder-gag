@@ -19,12 +19,10 @@ private:
     void handleProcessVideo(const msg_process_video& msg);
     void handleCreateVaaBlocks(const msg_create_vaa_blocks& msg);
     
-    // Определение параметров видео (заглушка / имитация)
     msg_video_params analyzeVideo(const std::string& file_path, const std::string& record_id, int request_id);
-    
-    // Создание VAA блоков (заглушка)
-    std::vector<VaaBlock> generateVaaBlocks(const std::string& record_id, int duration);
+    std::vector<VaaBlock> generateVaaBlocks(const std::string& record_id, int duration_seconds);
 
     so_5::mbox_t m_db_mbox;
     int m_processed_count;
+    std::string m_ffprobe_path;
 };
