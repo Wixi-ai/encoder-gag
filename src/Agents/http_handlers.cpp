@@ -153,17 +153,31 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
             m_pending_creates[request.id] = promise;
         }
 
-        msg_create_record msg;
+        // Извлекаем путь к первому видео файлу из запроса
+        std::string video_path = "";
+        for (const auto& stream : request.streams) {
+            if (stream.type == "video" && !stream.files.empty()) {
+                video_path = stream.files[0].path;
+                break;
+            }
+        }
+        
+        if (video_path.empty()) {
+            std::cout << COLOR_YELLOW << "  [WARN] No video file found in request" << COLOR_RESET << std::endl;
+            video_path = "/default/video.mp4";
+        }
 
         // Отправляем видео на анализ в ffmpeg_agent
         msg_process_video video_msg;
         video_msg.record_id = request.id;
-        video_msg.file_path = "C:/test/video.mp4";
+        video_msg.file_path = video_path;
         video_msg.request_id = m_request_counter;
         video_msg.reply_to = so_direct_mbox();
         so_5::send<msg_process_video>(m_ffmpeg_mbox, video_msg);
 
-        std::cout << COLOR_HTTP << "  -> FFmpeg Agent | sent for analysis" << COLOR_RESET << std::endl;
+        std::cout << COLOR_HTTP << "  -> FFmpeg Agent | sent for analysis: " << video_path << COLOR_RESET << std::endl;
+        
+        msg_create_record msg;
         msg.id = request.id;
         msg.streams = request.streams;
         msg.block_size = request.block_size;
