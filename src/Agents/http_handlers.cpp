@@ -149,21 +149,25 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
 
         // Извлекаем путь к первому видео файлу из запроса
         std::string video_path = "";
-        for (const auto& stream : request.streams) {
-            if (stream.type == "video" && !stream.files.empty()) {
+        for (const auto &stream : request.streams)
+        {
+            if (stream.type == "video" && !stream.files.empty())
+            {
                 video_path = stream.files[0].path;
                 break;
             }
         }
-        
-        if (video_path.empty()) {
+
+        if (video_path.empty())
+        {
             std::cout << COLOR_YELLOW << "  [WARN] No video file found in request" << COLOR_RESET << std::endl;
             video_path = "/default/video.mp4";
         }
 
         // ПРОВЕРКА: существует ли видео файл
-        FILE* test_file = fopen(video_path.c_str(), "rb");
-        if (!test_file) {
+        FILE *test_file = fopen(video_path.c_str(), "rb");
+        if (!test_file)
+        {
             std::cout << COLOR_RED << "  [ERROR] Video file not found: " << video_path << COLOR_RESET << std::endl;
             res.set_content("{\"error\": \"video file not found: " + video_path + "\"}", "application/json");
             res.status = static_cast<int>(HttpStatus::BAD_REQUEST);
@@ -189,7 +193,7 @@ void http_agent_t::handlePost(const httplib::Request &req, httplib::Response &re
         so_5::send<msg_process_video>(m_ffmpeg_mbox, video_msg);
 
         std::cout << COLOR_HTTP << "  -> FFmpeg Agent | sent for analysis: " << video_path << COLOR_RESET << std::endl;
-        
+
         msg_create_record msg;
         msg.id = request.id;
         msg.streams = request.streams;
@@ -496,34 +500,38 @@ void http_agent_t::handleDelete(const std::string &id, httplib::Response &res)
     }
 }
 
-void http_agent_t::handleGetVaaBlocks(const std::string& id, const httplib::Request& req, httplib::Response& res)
+void http_agent_t::handleGetVaaBlocks(const std::string &id, const httplib::Request &req, httplib::Response &res)
 {
-    if (!is_valid_uuid(id)) {
+    if (!is_valid_uuid(id))
+    {
         res.set_content("{\"error\": \"invalid uuid format\"}", "application/json");
         res.status = 400;
         return;
     }
-    
+
     int limit = 100;
     int offset = 0;
-    if (req.has_param("limit")) {
+    if (req.has_param("limit"))
+    {
         limit = std::stoi(req.get_param_value("limit"));
-        if (limit > 100) limit = 100;
+        if (limit > 100)
+            limit = 100;
     }
-    if (req.has_param("offset")) {
+    if (req.has_param("offset"))
+    {
         offset = std::stoi(req.get_param_value("offset"));
     }
-    
+
     int req_id = ++m_request_id_counter;
-    printRequest("GET", "/api/v1/archive/records/" + id + "/vva_blocks", req_id, id.substr(0,8), "");
-    
+    printRequest("GET", "/api/v1/archive/records/" + id + "/vva_blocks", req_id, id.substr(0, 8), "");
+
     auto promise = std::make_shared<std::promise<msg_get_vaa_blocks_response>>();
     auto future = promise->get_future();
     {
         std::lock_guard<std::mutex> lock(m_pending_vaa_mutex);
         m_pending_vaa_requests[req_id] = promise;
     }
-    
+
     msg_get_vaa_blocks msg;
     msg.record_id = id;
     msg.request_id = req_id;
@@ -531,31 +539,34 @@ void http_agent_t::handleGetVaaBlocks(const std::string& id, const httplib::Requ
     msg.offset = offset;
     msg.reply_to = so_direct_mbox();
     so_5::send<msg_get_vaa_blocks>(m_db_mbox, msg);
-    
-    if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+
+    if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
+    {
         res.set_content("{\"error\": \"timeout\"}", "application/json");
         res.status = 504;
         return;
     }
-    
+
     auto response = future.get();
-    if (!response.found) {
+    if (!response.found)
+    {
         res.set_content("{\"error\": \"record not found\"}", "application/json");
         res.status = 404;
         return;
     }
-    
+
     nlohmann::json j;
     j["record_id"] = response.record_id;
     j["total"] = response.total;
     j["limit"] = response.limit;
     j["offset"] = response.offset;
     nlohmann::json blocks_array = nlohmann::json::array();
-    for (const auto& b : response.blocks) {
+    for (const auto &b : response.blocks)
+    {
         blocks_array.push_back({{"index", b.index}, {"type", b.type}, {"pts", b.pts}, {"duration", b.duration}, {"data", b.data}});
     }
     j["blocks"] = blocks_array;
-    
+
     res.set_content(j.dump(), "application/json");
     res.status = 200;
     printResponse(res.status, j.dump().substr(0, 60) + "...");
