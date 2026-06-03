@@ -182,3 +182,23 @@ struct msg_create_vaa_blocks {
     int request_id;
     so_5::mbox_t reply_to;
 };
+
+// HTTP -> DB: получить VAA блоки
+struct msg_get_vaa_blocks {
+    std::string record_id;
+    int request_id;
+    int limit;
+    int offset;
+    so_5::mbox_t reply_to;
+};
+
+// DB -> HTTP: ответ с VAA блоками
+struct msg_get_vaa_blocks_response {
+    int request_id;
+    bool found;
+    std::string record_id;
+    int total;
+    int limit;
+    int offset;
+    std::vector<VaaBlock> blocks;
+};

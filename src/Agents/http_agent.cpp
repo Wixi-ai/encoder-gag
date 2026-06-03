@@ -1,8 +1,3 @@
-/**
- * @file http_agent.cpp
- * @brief HTTP серверный агент - основная логика
- */
-
 #include "../../include/agents/http_agent.hpp"
 #include "../../include/colors.hpp"
 #include "../../include/utils.hpp"
@@ -33,59 +28,71 @@ void http_agent_t::so_evt_start()
     printStartupInfo();
     LOG_INFO("HTTP", "Starting HTTP server on " + m_host + ":" + std::to_string(m_port));
 
-    // Подписки на ответы
     so_subscribe_self().event([this](const msg_create_response &response)
-                              {
+    {
         auto it = m_pending_creates.find(response.id);
         if (it != m_pending_creates.end()) {
             it->second->set_value(response.success);
             std::lock_guard<std::mutex> lock(m_creates_mutex);
             m_pending_creates.erase(it);
-        } });
+        }
+    });
 
     so_subscribe_self().event([this](const msg_get_records_response &response)
-                              {
+    {
         auto it = m_pending_requests.find(response.request_id);
         if (it != m_pending_requests.end()) {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_mutex);
             m_pending_requests.erase(it);
-        } });
+        }
+    });
 
     so_subscribe_self().event([this](const msg_get_record_by_id_response &response)
-                              {
+    {
         auto it = m_pending_record_requests.find(response.request_id);
         if (it != m_pending_record_requests.end()) {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_record_mutex);
             m_pending_record_requests.erase(it);
-        } });
+        }
+    });
 
     so_subscribe_self().event([this](const msg_delete_record_by_id_response &response)
-                              {
+    {
         auto it = m_pending_delete_requests.find(response.request_id);
         if (it != m_pending_delete_requests.end()) {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_delete_mutex);
             m_pending_delete_requests.erase(it);
-        } });
+        }
+    });
+    
+    so_subscribe_self().event([this](const msg_get_vaa_blocks_response &response)
+    {
+        auto it = m_pending_vaa_requests.find(response.request_id);
+        if (it != m_pending_vaa_requests.end()) {
+            it->second->set_value(response);
+            std::lock_guard<std::mutex> lock(m_pending_vaa_mutex);
+            m_pending_vaa_requests.erase(it);
+        }
+    });
         
     so_subscribe_self().event([this](const msg_video_params &response)
-                              {
+    {
         auto it = m_pending_video_requests.find(response.request_id);
         if (it != m_pending_video_requests.end()) {
             it->second->set_value(response);
             std::lock_guard<std::mutex> lock(m_pending_video_mutex);
             m_pending_video_requests.erase(it);
-        } });
+        }
+    });
         
     so_subscribe_self().event([this](const msg_vaa_blocks_response &response)
-                              {
+    {
         std::cout << COLOR_MAGENTA << "[" << current_time() << "] [HTTP] VAA blocks response: " 
                   << (response.success ? "success" : "failed") << COLOR_RESET << std::endl;
-        if (!response.success) {
-            LOG_ERROR("HTTP", "Failed to create VAA blocks: " + response.error_message);
-        } });
+    });
 
     m_server = std::make_unique<httplib::Server>();
 
@@ -100,6 +107,9 @@ void http_agent_t::so_evt_start()
 
     m_server->Delete(R"(/api/v1/records/([a-f0-9-]+))", [this](const httplib::Request &req, httplib::Response &res)
                      { handleDelete(req.matches[1], res); });
+    
+    m_server->Get(R"(/api/v1/archive/records/([a-f0-9-]+)/vva_blocks)", [this](const httplib::Request &req, httplib::Response &res)
+                  { handleGetVaaBlocks(req.matches[1], req, res); });
 
     m_server->Get("/health", [this](const httplib::Request &, httplib::Response &res)
                   {

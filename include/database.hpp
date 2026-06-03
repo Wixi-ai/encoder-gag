@@ -23,6 +23,8 @@ public:
     bool deleteRecordById(const std::string &id);
     std::tuple<std::vector<VideoStream>, std::vector<AudioStream>> getStreamsByRecordId(const std::string &record_id);
     bool saveVaaBlocks(const std::string &record_id, const std::vector<VaaBlock> &blocks);
+    std::vector<VaaBlock> getVaaBlocks(const std::string& record_id, int limit, int offset);
+    int getVaaBlocksCount(const std::string& record_id);
 
 private:
     sqlite3 *db = nullptr;

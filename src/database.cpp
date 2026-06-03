@@ -399,3 +399,47 @@ bool Database::saveVaaBlocks(const std::string &record_id, const std::vector<Vaa
     std::cout << COLOR_DB_COM << "[Database] Saved " << blocks.size() << " VAA blocks for record " << record_id << COLOR_RESET << std::endl;
     return true;
 }
+
+std::vector<VaaBlock> Database::getVaaBlocks(const std::string& record_id, int limit, int offset)
+{
+    std::vector<VaaBlock> blocks;
+    const char* sql = "SELECT block_index, block_type, pts, duration, data FROM vaa_blocks WHERE record_id = ? ORDER BY block_index LIMIT ? OFFSET ?;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << "[Database] Prepare error: " << sqlite3_errmsg(db) << std::endl;
+        return blocks;
+    }
+    
+    sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, limit);
+    sqlite3_bind_int(stmt, 3, offset);
+    
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        VaaBlock block;
+        block.index = sqlite3_column_int(stmt, 0);
+        block.type = (const char*)sqlite3_column_text(stmt, 1);
+        block.pts = sqlite3_column_int64(stmt, 2);
+        block.duration = sqlite3_column_int64(stmt, 3);
+        block.data = (const char*)sqlite3_column_text(stmt, 4) ?: "";
+        blocks.push_back(block);
+    }
+    sqlite3_finalize(stmt);
+    return blocks;
+}
+
+int Database::getVaaBlocksCount(const std::string& record_id)
+{
+    const char* sql = "SELECT COUNT(*) FROM vaa_blocks WHERE record_id = ?;";
+    sqlite3_stmt* stmt;
+    int count = 0;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            count = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return count;
+}
