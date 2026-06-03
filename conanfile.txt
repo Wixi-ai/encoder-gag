@@ -1,5 +1,5 @@
 [requires]
-cpp-httplib/0.12.4
+cpp-httplib/0.39.0
 nlohmann_json/3.11.2
 sobjectizer/5.7.5
 sqlite3/3.45.1

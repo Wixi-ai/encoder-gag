@@ -10,30 +10,56 @@
 - Git Bash / MSYS2 / Linux terminal (для цветного вывода)
 - FFmpeg (для анализа видео)
 
-## 🚀 Быстрый старт
+## Установка на другом компьютере
 
-### 1. Клонирование репозитория
+### Требования
+
+- Windows 10/11
+- MSYS2 с установленными mingw64, gcc, cmake, make
+- Git Bash (для скриптов)
+- Python 3.8+ и pip
+
+### Шаг 1. Установка MSYS2
+
+Скачайте msys2 с официального сайта. Запустите MSYS2 UCRT64 и выполните:
+
+```
+pacman -Syu
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake make
+```
+
+### Шаг 2. Установка Python и Conan
+
+```
+pacman -S mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-python-pip
+python -m venv ~/conan-env
+source ~/conan-env/bin/activate
+pip install conan
+```
+
+### Шаг 3. Установка FFmpeg
+
+Скачайте сборку с https://www.gyan.dev/ffmpeg/builds/ (выберите essentials). Распакуйте в C:/ffmpeg. Добавьте C:/ffmpeg/bin в PATH системной переменной.
+
+### Шаг 4. Клонирование и сборка
 
 ```
 git clone https://gitlab.rigel.bolid.ru/rigel/services/archive/encoders_gag.git
 cd encoders_gag
+source ~/conan-env/bin/activate
+conan install . --build=missing
+cmake . -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+mingw32-make
+./encoder_project.exe
 ```
 
-### 2. Установка FFmpeg
+### Нюансы
 
-Скачайте FFmpeg с https://www.gyan.dev/ffmpeg/builds/ и добавьте в PATH.
-
-### 3. Сборка проекта
-
-```
-./build.sh
-```
-
-### 4. Запуск сервера
-
-```
-./build/encoder_project.exe
-```
+- Запускайте сервер только в MSYS2 UCRT64 или Git Bash, иначе цветной вывод не работает.
+- Пути к видео в запросах указывайте в Windows формате C:/folder/video.mp4
+- Если ffprobe не найден, проверьте PATH или укажите путь в коде вручную.
+- База данных records.db создаётся в папке с сервером. Для переноса на другой компьютер скопируйте её вместе с бинарником.
+- При ошибке сборки удалите папки build и CMakeFiles и повторите шаг 4.
 
 ## 🔧 API Эндпоинты
 
