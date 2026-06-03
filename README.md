@@ -1,9 +1,6 @@
-
-
-
 # encoders_gag
 
-Сервер-заглушка для модуля архива проекта Ригель. Имитирует работу сервисов msm и controller для encoder.
+Сервер для модуля архива проекта Ригель. Реализует API для работы с записями и VAA блоками.
 
 ## 📋 Требования
 
@@ -11,31 +8,30 @@
 - Conan 2.x
 - MinGW (или Visual Studio)
 - Git Bash / MSYS2 / Linux terminal (для цветного вывода)
+- FFmpeg (для анализа видео)
 
 ## 🚀 Быстрый старт
 
 ### 1. Клонирование репозитория
 
-```bash
+```
 git clone https://gitlab.rigel.bolid.ru/rigel/services/archive/encoders_gag.git
 cd encoders_gag
 ```
 
-### 2. Сборка проекта
+### 2. Установка FFmpeg
 
-```bash
-./Start.sh
+Скачайте FFmpeg с https://www.gyan.dev/ffmpeg/builds/ и добавьте в PATH.
+
+### 3. Сборка проекта
+
+```
+./build.sh
 ```
 
-Скрипт автоматически:
-- Установит зависимости через Conan
-- Сконфигурирует CMake
-- Соберёт проект
-- Запустит сервер
+### 4. Запуск сервера
 
-### 3. Запуск вручную
-
-```bash
+```
 ./build/encoder_project.exe
 ```
 
@@ -53,7 +49,7 @@ cd encoders_gag
 
 В папке `scripts/` находятся удобные скрипты для проверки API:
 
-```bash
+```
 # Проверка здоровья сервера
 ./scripts/health.sh
 
@@ -78,6 +74,7 @@ cd encoders_gag
 # Тестирование обработки ошибок
 ./scripts/test_errors.sh
 ```
+
 ## 🔍 Фильтрация записей
 
 GET /api/v1/records поддерживает следующие параметры фильтрации:
@@ -89,103 +86,61 @@ GET /api/v1/records поддерживает следующие параметр
 | `to_date` | Записи до указанной даты | `?to_date=2026-05-31` |
 | `file_path` | Частичное совпадение пути | `?file_path=video` |
 
-### Примеры запросов с фильтрацией:
-
-```bash
-# Только кодек h264
-./scripts/get_sorted.sh created_at asc 10 0 "codec=h264"
-
-# Записи после 1 мая 2026
-./scripts/get_sorted.sh created_at asc 10 0 "from_date=2026-05-01"
-
-# Комбинация фильтров
-./scripts/get_sorted.sh created_at asc 5 0 "codec=h264&from_date=2026-05-01"
-```
-## 🧪 Проверка работы сервера
-
-После запуска сервера откройте **новое окно терминала** (Git Bash) и выполните:
-
-### 1. Проверка здоровья
-```bash
-# Проверка здоровья
-curl --noproxy "localhost" http://localhost:8080/health
-
-# Создание записи с UUID
-curl --noproxy "localhost" -X POST http://localhost:8080/api/v1/records \
-  -H "Content-Type: application/json" \
-  -d '{"id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","block_size":10,"fblock":"test","streams":[]}'
-
-# Получение всех записей
-curl --noproxy "localhost" http://localhost:8080/api/v1/records
-
-# Получение записи по ID
-curl --noproxy "localhost" http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-
-# Удаление записи по ID
-curl --noproxy "localhost" -X DELETE http://localhost:8080/api/v1/records/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-```
-
 ## 📁 Структура проекта
-```
 
+```
 encoder_project/
 ├── include/                          # Заголовочные файлы (.hpp)
 │   ├── colors.hpp                    # ANSI цвета для консоли
-│   ├── utils.hpp                     # Утилиты: current_time(), generate_uuid(), is_valid_uuid()
-│   ├── database.hpp                  # Работа с SQLite3 (объявление методов)
-│   ├── messages.hpp                  # Структуры сообщений между агентами
-│   ├── logger.hpp                    # Логирование в файл (класс Logger)
-│   ├── constants.hpp                 # Константы: DEFAULT_LIMIT, MAX_LIMIT, TIMEOUT_SECONDS
+│   ├── utils.hpp                     # Утилиты
+│   ├── database.hpp                  # Работа с SQLite3
+│   ├── messages.hpp                  # Структуры сообщений
+│   ├── logger.hpp                    # Логирование
+│   ├── constants.hpp                 # Константы
 │   ├── cache.hpp                     # Кеш для GET запросов
 │   └── agents/                       # Агенты (объявления)
-│       ├── db_agent.hpp              # DB агент — работа с базой данных
-│       ├── http_agent.hpp            # HTTP агент — обработка запросов
-│       └── ffmpeg_agent.hpp          # FFmpeg агент — анализ видео и VAA блоки
+│       ├── db_agent.hpp
+│       ├── http_agent.hpp
+│       └── ffmpeg_agent.hpp
 │
 ├── src/                              # Реализация (.cpp)
-│   ├── main.cpp                      # Точка входа, инициализация, graceful shutdown
-│   ├── database.cpp                  # Реализация методов Database (SQLite3)
-│   └── agents/                       # Агенты (реализация)
-│       ├── db_agent.cpp              # DB агент — сохранение, чтение, удаление записей
-│       ├── http_agent.cpp            # HTTP агент — основная логика (конструктор, подписки)
-│       ├── http_handlers.cpp         # Обработчики маршрутов (POST, GET, DELETE)
-│       ├── http_print.cpp            # Функции вывода (баннер, рамки, команды)
-│       └── ffmpeg_agent.cpp          # FFmpeg агент — реальный анализ видео через ffprobe
+│   ├── main.cpp
+│   ├── database.cpp
+│   └── agents/
+│       ├── db_agent.cpp
+│       ├── http_agent.cpp
+│       ├── http_handlers.cpp
+│       ├── http_print.cpp
+│       └── ffmpeg_agent.cpp
 │
-├── scripts/                          # Bash скрипты для тестирования API
-│   ├── health.sh                     # Проверка здоровья сервера (GET /health)
-│   ├── create.sh                     # Создание записи (POST /api/v1/records)
-│   ├── get.sh                        # Получение всех записей с пагинацией
-│   ├── get_sorted.sh                 # Получение записей с сортировкой и фильтрацией
-│   ├── get_by_id.sh                  # Получение записи по ID
-│   ├── delete.sh                     # Удаление записи по ID
-│   └── test_errors.sh                # Тестирование обработки ошибок (400, 404, 409)
+├── scripts/                          # Bash скрипты для тестирования
+│   ├── health.sh
+│   ├── create.sh
+│   ├── get.sh
+│   ├── get_sorted.sh
+│   ├── get_by_id.sh
+│   ├── delete.sh
+│   └── test_errors.sh
 │
-├── data/                             # Папка для данных БД (создаётся автоматически)
-│
-├── Dockerfile                        # Docker образ для контейнеризации
-├── docker-compose.yml                # Docker Compose для удобного запуска
-│
-├── CMakeLists.txt                    # Конфигурация сборки CMake
-├── conanfile.txt                     # Зависимости Conan
-│
-├── build.sh                          # Скрипт сборки проекта
-├── rebuild.sh                        # Полная пересборка с нуля
-├── start.sh                          # Запуск сервера (сборка + запуск)
-│
-└── README.md                         # Документация проекта
+├── CMakeLists.txt
+├── conanfile.txt
+├── build.sh
+├── rebuild.sh
+├── start.sh
+└── README.md
 ```
 
 ## 📦 Зависимости
 
-- cpp-httplib/0.14.3
+- cpp-httplib/0.12.4
 - nlohmann_json/3.11.2
-- sobjectizer/5.8.1
+- sobjectizer/5.7.5
 - sqlite3/3.45.1
+- FFmpeg (системный, через pacman или вручную)
 
 ## 🎨 Цветной вывод
 
-Цвета работают в Git Bash, MSYS2, WSL, Linux terminal. В обычной cmd.exe цвета не поддерживаются.
+Цвета работают в Git Bash, MSYS2, WSL, Linux terminal.
 
 ## 🔄 Статус разработки
 
@@ -202,116 +157,137 @@ encoder_project/
 - [x] Логирование в файл
 - [x] Graceful shutdown
 - [x] Docker контейнеризация
-- [ ] ffmpeg_pool актор
+- [x] FFmpeg агент (реальный анализ видео через ffprobe)
+- [x] VAA блоки (сегментация видео и аудио по 10 секунд)
+- [x] Проверка существования файла (400)
+- [x] Индексы в БД для быстрых запросов
 
-## 📝 Примечание
+## VAA блоки
 
-Флаг --noproxy "localhost" необходим при работе через корпоративный прокси
+При создании записи FFmpeg агент генерирует VAA блоки:
 
-ID записи должен быть в формате UUID (например, aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)
+- Видео нарезается на сегменты по 10 секунд
+- Аудио нарезается на сегменты по 10 секунд
+- Блоки сохраняются в таблицу `vaa_blocks`
 
+### Получение VAA блоков
 
-
-
-## 🐳 Docker
-
-### Сборка образа
 ```
-./docker-build.sh
-Запуск контейнера
+./scripts/get_vaa.sh 04cc951e-1c0f-4838-bc37-3d9d1c71b505
+```
 
-./docker-run.sh
-Запуск через docker-compose
+### Пример ответа
 
-./docker-compose-up.sh
-Остановка
+```
+{
+  "record_id": "04cc951e-1c0f-4838-bc37-3d9d1c71b505",
+  "total": 6,
+  "blocks": [
+    {"index": 0, "type": "video", "pts": 0, "duration": 10000},
+    {"index": 1, "type": "video", "pts": 10000, "duration": 10000},
+    {"index": 2, "type": "video", "pts": 20000, "duration": 10000},
+    {"index": 3, "type": "audio", "pts": 0, "duration": 10000},
+    {"index": 4, "type": "audio", "pts": 10000, "duration": 10000},
+    {"index": 5, "type": "audio", "pts": 20000, "duration": 10000}
+  ]
+}
+```
 
-./docker-compose-down.sh
-Просмотр логов
+## Кеширование
 
-docker logs -f encoders_gag
-Переменные окружения в Docker
+Для ускорения работы используется кеширование:
 
-docker run -d -p 9090:8080 \
-  -e ENCODERS_GAG_PORT=8080 \
-  -e ENCODERS_GAG_HOST=0.0.0.0 \
-  -e ENCODERS_GAG_DB=/data/records.db \
-  -v ./data:/data \
-  --name encoders_gag encoders_gag:latest
+| Эндпоинт | Кеш | TTL | Инвалидация |
+|----------|-----|-----|-------------|
+| GET /api/v1/records | m_records_cache | 60 сек | POST/DELETE |
+| GET /api/v1/records/{id} | m_record_cache | 60 сек | POST/DELETE |
+| GET /api/v1/archive/records/{id}/vva_blocks | m_vaa_cache | бессрочно | POST/DELETE |
+
+## Новые скрипты
+
+```
+# Получение VAA блоков
+./scripts/get_vaa.sh <record_id> [limit] [offset]
+
+# Пример
+./scripts/get_vaa.sh 04cc951e-1c0f-4838-bc37-3d9d1c71b505
+./scripts/get_vaa.sh 04cc951e-1c0f-4838-bc37-3d9d1c71b505 5 0
 ```
 
 ## 🏗 Как работает проект
 
 ### Архитектура
 
-Проект построен на асинхронной модели акторов с использованием фреймворка SObjectizer. В системе работают два независимых актора:
+Проект построен на асинхронной модели акторов с использованием фреймворка SObjectizer. В системе работают три независимых агента:
 
-1. **HTTP-агент** — запускает веб-сервер на порту 8080, принимает REST-запросы, валидирует данные, отправляет сообщения DB-агенту
-2. **DB-агент** — получает сообщения от HTTP-агента, выполняет операции с SQLite3 базой данных
+1. **HTTP-агент** — запускает веб-сервер на порту 8080, принимает REST-запросы, валидирует данные, проверяет существование файла, отправляет сообщения другим агентам
+2. **FFmpeg-агент** — выполняет реальный анализ видео через ffprobe (определяет codec, разрешение, длительность), генерирует VAA блоки
+3. **DB-агент** — получает сообщения от HTTP и FFmpeg агентов, выполняет операции с SQLite3 (сохранение записей, VAA блоков, чтение, удаление)
 
-Акторы общаются через асинхронные сообщения, что позволяет разнести логику получения запросов и логику работы с диском.
+### Схема работы
+
+```
+Client -> HTTP Agent -> FFmpeg Agent -> DB Agent -> SQLite3
+              |             |              |
+          Response     Video params    Save record
+```
 
 ### Полный цикл создания записи
 
 1. Пользователь отправляет POST запрос на `/api/v1/records` с JSON-данными
 2. HTTP-агент валидирует UUID, block_size, fblock, streams
-3. Из streams извлекается codec первого потока
-4. HTTP-агент отправляет DB-агенту сообщение `msg_create_record`
-5. HTTP-агент ожидает ответа через promise/future (таймаут 5 секунд)
-6. DB-агент сохраняет запись в SQLite3 (id, file_path, codec)
-7. DB-агент отправляет ответ с результатом операции
-8. HTTP-агент возвращает клиенту статус 201 Created или 409 Conflict
-
-### Полный цикл получения всех записей
-
-1. Пользователь отправляет GET запрос на `/api/v1/records?limit=10&offset=0&sort_by=created_at&sort_order=desc&codec=h264`
-2. HTTP-агент парсит параметры пагинации, сортировки и фильтрации
-3. HTTP-агент отправляет DB-агенту сообщение `msg_get_records` с этими параметрами
-4. DB-агент формирует SQL-запрос с учетом фильтров, сортировки и пагинации
-5. DB-агент выполняет запрос и получает общее количество записей
-6. DB-агент отправляет ответ с массивом записей и мета-информацией
-7. HTTP-агент формирует JSON и возвращает клиенту
-
-### Полный цикл получения записи по ID
-
-1. Пользователь отправляет GET запрос на `/api/v1/records/{id}`
-2. HTTP-агент проверяет формат UUID (должен быть 36 символов, только hex и дефисы)
-3. HTTP-агент отправляет DB-агенту сообщение `msg_get_record_by_id`
-4. DB-агент ищет запись в БД по id
-5. Если найдена — отправляет обратно, если нет — отправляет `found=false`
-6. HTTP-агент возвращает 200 OK с данными или 404 Not Found
-
-### Полный цикл удаления записи
-
-1. Пользователь отправляет DELETE запрос на `/api/v1/records/{id}`
-2. HTTP-агент проверяет формат UUID
-3. HTTP-агент отправляет DB-агенту сообщение `msg_delete_record_by_id`
-4. DB-агент удаляет запись из БД
-5. DB-агент отправляет ответ с результатом
-6. HTTP-агент возвращает 200 OK или 404 Not Found
+3. HTTP-агент проверяет существование видеофайла (если нет — возвращает 400)
+4. HTTP-агент отправляет FFmpeg-агенту сообщение на анализ видео
+5. FFmpeg-агент через ffprobe определяет параметры видео (codec, ширина, высота, длительность)
+6. FFmpeg-агент генерирует VAA блоки (сегменты по 10 секунд)
+7. FFmpeg-агент отправляет DB-агенту сообщение на сохранение VAA блоков
+8. HTTP-агент отправляет DB-агенту сообщение на сохранение записи
+9. DB-агент сохраняет запись и VAA блоки в SQLite3
+10. HTTP-агент возвращает клиенту статус 201 Created
 
 ### Обработка ошибок
 
 | Статус | Ситуация |
 |--------|----------|
-| 400 | Неверный формат UUID, пустое тело запроса, невалидный JSON, отсутствие обязательных полей, block_size ≤ 0 |
+| 400 | Неверный формат UUID, пустое тело, невалидный JSON, block_size ≤ 0, видеофайл не существует |
 | 404 | Запись с указанным ID не найдена |
 | 409 | Попытка создать запись с уже существующим ID |
-| 504 | Таймаут ожидания ответа от DB-агента (5 секунд) |
+| 504 | Таймаут ожидания ответа от агента |
 
 ### Технологический стек
 
 - **C++17** — язык программирования
 - **CMake + Conan** — сборка и управление зависимостями
-- **SObjectizer** — асинхронный фреймворк для обмена сообщениями между акторами
+- **SObjectizer** — асинхронный фреймворк для обмена сообщениями
 - **cpp-httplib** — HTTP-сервер
 - **nlohmann/json** — парсинг и сериализация JSON
 - **SQLite3** — база данных
+- **FFmpeg** — анализ видео (ffprobe)
 
-### Дополнительные возможности
+## 🐳 Docker
 
-- **Graceful shutdown** — корректное завершение при нажатии Ctrl+C
-- **Логирование в файл** — все действия записываются в `encoders_gag.log`
-- **Конфигурация через переменные окружения** — порт, хост, путь к БД, файл лога
-- **Цветной вывод в консоль** — разные цвета для HTTP, DB и MAIN компонентов
-- **Docker контейнеризация** — запуск одной командой `docker-compose up -d`
+### Сборка образа
+```
+./docker-build.sh
+```
+
+### Запуск контейнера
+```
+./docker-run.sh
+```
+
+### Запуск через docker-compose
+```
+./docker-compose-up.sh
+```
+
+### Остановка
+```
+./docker-compose-down.sh
+```
+
+## 📝 Примечание
+
+- Флаг `--noproxy "localhost"` необходим при работе через корпоративный прокси
+- ID записи должен быть в формате UUID (например, `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`)
+- FFmpeg должен быть установлен и доступен в PATH (для работы ffprobe)

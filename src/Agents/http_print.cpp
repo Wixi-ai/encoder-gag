@@ -32,6 +32,7 @@ void http_agent_t::printStartupInfo()
               << "  |    GET    /api/v1/records         - Get all records (pagination + sorting)   |\n"
               << "  |    GET    /api/v1/records/{id}    - Get record by ID                         |\n"
               << "  |    DELETE /api/v1/records/{id}    - Delete record by ID                      |\n"
+              << "  |    GET    /api/v1/archive/records/{id}/vva_blocks - Get VAA blocks           |\n"
               << "  |    GET    /health                 - Health check                             |\n"
               << "  +------------------------------------------------------------------------------+\n"
               << COLOR_RESET;
@@ -39,8 +40,8 @@ void http_agent_t::printStartupInfo()
     std::cout << COLOR_MAGENTA << "\n"
               << "  +------------------------------------------------------------------------------+\n"
               << "  |  FFMPEG AGENT ACTIVE                                                         |\n"
-              << "  |    - Video analysis (codec, width, height, duration)                         |\n"
-              << "  |    - VAA blocks generation                                                   |\n"
+              << "  |    - Real video analysis via ffprobe (codec, resolution, duration)          |\n"
+              << "  |    - VAA blocks generation (10-second segments)                              |\n"
               << "  +------------------------------------------------------------------------------+\n"
               << COLOR_RESET;
 
@@ -71,6 +72,9 @@ void http_agent_t::printStartupInfo()
               << "  |                                                                              |\n"
               << "  |    # Get record by ID                                                        |\n"
               << "  |    ./scripts/get_by_id.sh <uuid>                                             |\n"
+              << "  |                                                                              |\n"
+              << "  |    # Get VAA blocks by ID                                                    |\n"
+              << "  |    ./scripts/get_vaa.sh <uuid> [limit] [offset]                              |\n"
               << "  |                                                                              |\n"
               << "  |    # Delete record by ID                                                     |\n"
               << "  |    ./scripts/delete.sh <uuid>                                                |\n"
