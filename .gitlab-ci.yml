@@ -6,10 +6,10 @@ variables:
   CPP_BUILDER_IMAGE: "gitlab.rigel.bolid.ru:5050/mirror/imagegcc/ubuntu24.02-gcc13:0.5.0"
   CPP_PACKAGE_IMAGE: "gitlab.rigel.bolid.ru:5050/rigel/build_repository:0.1.0"
 
-  CPP_BIN_NAME: controller
+  CPP_BIN_NAME: encoder_project
   CPP_CONAN_PROFILE: ubuntu2404-gcc13-relwithdebinfo
   CPP_CMAKE_PRESET: conan-relwithdebinfo
-  CPP_VERSION_ENV_PREFIX: controller
+  CPP_VERSION_ENV_PREFIX: encoders_gag
   CPP_CONAN_BUILD_POLICY: missing
   CPP_CONAN_CONFIG_PROJECT: mirror/conan-config
   CPP_DOCKER_ROOTFS_DIR: docker-rootfs
