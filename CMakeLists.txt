@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Убираем абсолютные пути для установки
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install path" FORCE)
 endif()
@@ -52,5 +51,4 @@ if(WIN32)
     )
 endif()
 
-# Установка (опционально)
 install(TARGETS ${PACKAGE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
