@@ -3,7 +3,7 @@ cpp-httplib/0.39.0
 nlohmann_json/3.12.0
 sobjectizer/5.8.1
 sqlite3/3.53.0
-gtest/1.14.0
+gtest/1.17.0
 
 [generators]
 CMakeDeps
