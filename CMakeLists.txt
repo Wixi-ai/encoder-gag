@@ -17,6 +17,9 @@ if(EXISTS "${CMAKE_BINARY_DIR}/generators/conan_toolchain.cmake")
     include(${CMAKE_BINARY_DIR}/generators/conan_toolchain.cmake)
 endif()
 
+add_definitions(-DCPPHTTPLIB_USE_POLL)
+add_definitions(-DCPPHTTPLIB_NO_EXCEPTIONS)
+
 find_package(httplib REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(sobjectizer REQUIRED)
@@ -24,7 +27,13 @@ find_package(SQLite3 REQUIRED)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(${PROJECT_NAME} 
+# Форсируем Windows 7 API для совместимости с cpp-httplib 0.39.0
+add_definitions(-D_WIN32_WINNT=0x0601)
+add_definitions(-DWINVER=0x0601)
+add_definitions(-DNTDDI_VERSION=0x06010000)
+add_definitions(-DCPPHTTPLIB_USE_POLL)
+
+add_executable(${PROJECT_NAME}
     src/main.cpp
     src/database.cpp
     src/agents/db_agent.cpp
@@ -34,13 +43,8 @@ add_executable(${PROJECT_NAME}
     src/agents/ffmpeg_agent.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}
-    httplib::httplib
-    nlohmann_json::nlohmann_json
-    sobjectizer::StaticLib
-    SQLite::SQLite3
-)
-
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} ws2_32)
+    target_link_libraries(${PROJECT_NAME} httplib::httplib nlohmann_json::nlohmann_json sobjectizer::StaticLib SQLite::SQLite3 ws2_32)
+else()
+    target_link_libraries(${PROJECT_NAME} httplib::httplib nlohmann_json::nlohmann_json sobjectizer::StaticLib SQLite::SQLite3)
 endif()

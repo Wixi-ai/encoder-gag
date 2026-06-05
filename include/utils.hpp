@@ -7,15 +7,16 @@
 #include <sstream>
 #include <random>
 
-/**
- * @brief Возвращает текущее время в формате ЧЧ:ММ:СС.мсс
- */
 inline std::string current_time() {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
     std::tm tm;
+    #ifdef _WIN32
     localtime_s(&tm, &time_t);
+    #else
+    localtime_r(&time_t, &tm);
+    #endif
     char buf[20];
     std::strftime(buf, sizeof(buf), "%H:%M:%S", &tm);
     std::stringstream ss;
@@ -23,9 +24,6 @@ inline std::string current_time() {
     return ss.str();
 }
 
-/**
- * @brief Генерирует UUID v4
- */
 inline std::string generate_uuid() {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -42,9 +40,6 @@ inline std::string generate_uuid() {
     return ss.str();
 }
 
-/**
- * @brief Проверяет, является ли строка валидным UUID
- */
 inline bool is_valid_uuid(const std::string& uuid) {
     if (uuid.length() != 36) return false;
     for (size_t i = 0; i < uuid.length(); ++i) {

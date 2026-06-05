@@ -9,9 +9,6 @@
 #include <sstream>
 #include "colors.hpp"
 
-/**
- * @brief Класс для логирования в консоль и файл одновременно
- */
 class Logger {
 public:
     static Logger& instance() {
@@ -19,7 +16,7 @@ public:
         return log;
     }
     
-    void init(const std::string& filename = "server.log") {
+    void init(const std::string& filename = "encoders_gag.log") {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (m_file.is_open()) m_file.close();
         m_file.open(filename, std::ios::app);
@@ -41,10 +38,6 @@ public:
     void debug(const std::string& tag, const std::string& msg) {
         log("DEBUG", tag, msg, COLOR_CYAN);
     }
-    
-    ~Logger() {
-        if (m_file.is_open()) m_file.close();
-    }
 
 private:
     Logger() : m_enabled(false) {}
@@ -56,22 +49,23 @@ private:
         auto time_t = std::chrono::system_clock::to_time_t(now);
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
         std::tm tm;
+        #ifdef _WIN32
         localtime_s(&tm, &time_t);
+        #else
+        localtime_r(&time_t, &tm);
+        #endif
         
-        char time_buf[20];
-        std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm);
+        char buf[20];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
         
-        // Форматируем сообщение
         std::stringstream ss;
-        ss << "[" << time_buf << "." << std::setfill('0') << std::setw(3) << ms.count() << "] "
+        ss << "[" << buf << "." << std::setfill('0') << std::setw(3) << ms.count() << "] "
            << "[" << level << "] [" << tag << "] " << msg;
         
-        // В консоль с цветом
         if (m_enabled) {
             std::cout << color << ss.str() << COLOR_RESET << std::endl;
         }
         
-        // В файл без цвета
         if (m_file.is_open()) {
             m_file << ss.str() << std::endl;
             m_file.flush();
@@ -83,7 +77,7 @@ private:
     bool m_enabled;
 };
 
-#define LOG_INFO(tag, msg) Logger::instance().info(tag, msg)
-#define LOG_WARN(tag, msg) Logger::instance().warn(tag, msg)
+#define LOG_INFO(tag, msg)  Logger::instance().info(tag, msg)
+#define LOG_WARN(tag, msg)  Logger::instance().warn(tag, msg)
 #define LOG_ERROR(tag, msg) Logger::instance().error(tag, msg)
 #define LOG_DEBUG(tag, msg) Logger::instance().debug(tag, msg)
