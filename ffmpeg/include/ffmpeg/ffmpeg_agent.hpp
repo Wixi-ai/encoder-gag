@@ -4,10 +4,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "../messages.hpp"
-#include "../colors.hpp"
-#include "../utils.hpp"
-#include "../logger.hpp"
+#include "messages/messages.hpp"
+#include "utils/colors.hpp"
+#include "utils/utils.hpp"
+#include "utils/logger.hpp"
 
 class ffmpeg_agent_t : public so_5::agent_t {
 public:

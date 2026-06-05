@@ -1,5 +1,5 @@
-#include "../include/database.hpp"
-#include "../include/colors.hpp"
+#include "database/database.hpp"
+#include "utils/colors.hpp"
 #include <iostream>
 #include <sstream>
 

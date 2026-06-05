@@ -1,9 +1,9 @@
 #include <so_5/all.hpp>
-#include "../include/agents/db_agent.hpp"
-#include "../include/agents/http_agent.hpp"
-#include "../include/agents/ffmpeg_agent.hpp"
-#include "../include/colors.hpp"
-#include "../include/logger.hpp"
+#include "db/db_agent.hpp"
+#include "http/http_agent.hpp"
+#include "ffmpeg/ffmpeg_agent.hpp"
+#include "utils/colors.hpp"
+#include "utils/logger.hpp"
 #include <thread>
 #include <chrono>
 #include <cstdlib>

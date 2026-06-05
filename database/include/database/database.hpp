@@ -5,7 +5,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
-#include "messages.hpp"
+#include "messages/messages.hpp"
 
 class Database
 {
@@ -25,6 +25,7 @@ public:
     bool saveVaaBlocks(const std::string &record_id, const std::vector<VaaBlock> &blocks);
     std::vector<VaaBlock> getVaaBlocks(const std::string& record_id, int limit, int offset);
     int getVaaBlocksCount(const std::string& record_id);
+    sqlite3* getDb() { return db; }
 
 private:
     sqlite3 *db = nullptr;

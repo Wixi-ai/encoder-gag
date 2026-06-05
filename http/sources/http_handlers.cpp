@@ -1,8 +1,8 @@
-#include "../../include/agents/http_agent.hpp"
-#include "../../include/colors.hpp"
-#include "../../include/utils.hpp"
-#include "../../include/logger.hpp"
-#include "../../include/constants.hpp"
+#include "http/http_agent.hpp"
+#include "utils/colors.hpp"
+#include "utils/utils.hpp"
+#include "utils/logger.hpp"
+#include "utils/constants.hpp"
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <tuple>

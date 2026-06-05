@@ -1,11 +1,10 @@
 #pragma once
 
-// Форсируем старые Windows API для совместимости с cpp-httplib 0.39.0
+// Отключаем проверку Windows версии
 #define _WIN32_WINNT 0x0601
 #define WINVER 0x0601
-#define NTDDI_VERSION 0x06010000
 
-// Отключаем использование CreateFile2 и GetAddrInfoExCancel
 #define CPPHTTPLIB_USE_POLL
+#define CPPHTTPLIB_NO_EXCEPTIONS
 
 #include <httplib.h>

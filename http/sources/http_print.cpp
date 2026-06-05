@@ -1,6 +1,6 @@
-#include "../../include/agents/http_agent.hpp"
-#include "../../include/colors.hpp"
-#include "../../include/logger.hpp"
+#include "http/http_agent.hpp"
+#include "utils/colors.hpp"
+#include "utils/logger.hpp"
 #include <iostream>
 #include <iomanip>
 

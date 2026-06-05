@@ -2,10 +2,10 @@
 
 #include <so_5/all.hpp>
 #include <iostream>
-#include "../messages.hpp"
-#include "../database.hpp"
-#include "../colors.hpp"
-#include "../utils.hpp"
+#include "messages/messages.hpp"
+#include "database/database.hpp"
+#include "utils/colors.hpp"
+#include "utils/utils.hpp"
 
 class db_agent_t : public so_5::agent_t {
 public:
