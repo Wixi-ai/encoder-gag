@@ -27,10 +27,10 @@ COPY docker-rootfs/app/ /app/
 
 ENV LD_LIBRARY_PATH=/app/lib
 
-RUN useradd -r -u 10001 -g nogroup encoders_gag || true
+RUN useradd -r -u 10001 -g nogroup encoder_project || true
 
 USER 10001
 
 EXPOSE 80
 
-CMD ["/app/encoders_gag"]
+CMD ["/app/encoder_project"]
