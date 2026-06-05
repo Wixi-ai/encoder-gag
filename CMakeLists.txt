@@ -7,12 +7,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Убираем абсолютные пути для установки
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install path" FORCE)
+endif()
+
 find_package(httplib REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(sobjectizer REQUIRED)
 find_package(SQLite3 REQUIRED)
 
-# Добавляем все include директории
 include_directories(include)
 include_directories(http/include)
 include_directories(db/include)
@@ -47,3 +51,6 @@ if(WIN32)
         CPPHTTPLIB_NO_EXCEPTIONS
     )
 endif()
+
+# Установка (опционально)
+install(TARGETS ${PACKAGE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
