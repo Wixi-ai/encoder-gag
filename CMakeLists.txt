@@ -16,25 +16,25 @@ find_package(nlohmann_json REQUIRED)
 find_package(sobjectizer REQUIRED)
 find_package(SQLite3 REQUIRED)
 
-include_directories(include)
-include_directories(http/include)
-include_directories(db/include)
-include_directories(ffmpeg/include)
-include_directories(database/include)
-include_directories(utils/include)
-include_directories(messages/include)
+# Подключаем компоненты
+add_subdirectory(database)
+add_subdirectory(db)
+add_subdirectory(http)
+add_subdirectory(ffmpeg)
+add_subdirectory(utils)
+add_subdirectory(messages)
 
 add_executable(${PACKAGE_NAME}
     encoder/sources/main.cpp
-    database/sources/database.cpp
-    db/sources/db_agent.cpp
-    http/sources/http_agent.cpp
-    http/sources/http_handlers.cpp
-    http/sources/http_print.cpp
-    ffmpeg/sources/ffmpeg_agent.cpp
 )
 
 target_link_libraries(${PACKAGE_NAME}
+    database_lib
+    db_lib
+    http_lib
+    ffmpeg_lib
+    utils_lib
+    messages_lib
     httplib::httplib
     nlohmann_json::nlohmann_json
     sobjectizer::StaticLib
@@ -50,5 +50,29 @@ if(WIN32)
         CPPHTTPLIB_NO_EXCEPTIONS
     )
 endif()
+
+# Тесты
+enable_testing()
+find_package(GTest REQUIRED)
+
+function(add_test_case NAME SOURCE)
+    add_executable(${NAME} ${SOURCE})
+    target_link_libraries(${NAME}
+        database_lib
+        db_lib
+        http_lib
+        ffmpeg_lib
+        utils_lib
+        messages_lib
+        SQLite::SQLite3
+        GTest::gtest_main
+        sobjectizer::StaticLib
+    )
+    add_test(NAME ${NAME} COMMAND ${NAME})
+endfunction()
+
+add_test_case(test_vaa_blocks tests/test_vaa_blocks.cpp)
+add_test_case(test_single_vaa_block tests/test_single_vaa_block.cpp)
+add_test_case(test_database tests/test_database.cpp)
 
 install(TARGETS ${PACKAGE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
