@@ -1,3 +1,7 @@
+Понял, обновлю зависимости в README.md под текущую структуру.
+
+
+
 # encoders_gag
 
 Сервер для модуля архива проекта Ригель. Реализует API для работы с записями и VAA блоками.
@@ -47,10 +51,8 @@ pip install conan
 git clone https://gitlab.rigel.bolid.ru/rigel/services/archive/encoders_gag.git
 cd encoders_gag
 source ~/conan-env/bin/activate
-conan install . --build=missing
-cmake . -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-mingw32-make
-./encoder_project.exe
+./build_local.sh
+./build/Release/encoder_project.exe
 ```
 
 ### Нюансы
@@ -65,11 +67,12 @@ mingw32-make
 
 | Метод | Эндпоинт | Описание |
 |-------|----------|----------|
-| POST | `/api/v1/records` | Создание новой записи |
-| GET | `/api/v1/records` | Получение списка записей |
-| GET | `/api/v1/records/{id}` | Получение записи по ID |
-| DELETE | `/api/v1/records/{id}` | Удаление записи по ID |
-| GET | `/health` | Проверка состояния сервера |
+| POST | /api/v1/records | Создание новой записи |
+| GET | /api/v1/records | Получение списка записей |
+| GET | /api/v1/records/{id} | Получение записи по ID |
+| DELETE | /api/v1/records/{id} | Удаление записи по ID |
+| GET | /api/v1/archive/records/{id}/vva_blocks | Получение VAA блоков |
+| GET | /health | Проверка состояния сервера |
 
 ## 🚀 Быстрые скрипты для тестирования
 
@@ -94,6 +97,9 @@ mingw32-make
 # Получение записи по ID
 ./scripts/get_by_id.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
+# Получение VAA блоков
+./scripts/get_vaa.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
 # Удаление записи по ID
 ./scripts/delete.sh "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
@@ -107,76 +113,67 @@ GET /api/v1/records поддерживает следующие параметр
 
 | Параметр | Описание | Пример |
 |----------|----------|--------|
-| `codec` | Фильтр по кодеку | `?codec=h264` |
-| `from_date` | Записи после указанной даты | `?from_date=2026-05-01` |
-| `to_date` | Записи до указанной даты | `?to_date=2026-05-31` |
-| `file_path` | Частичное совпадение пути | `?file_path=video` |
+| codec | Фильтр по кодеку | ?codec=h264 |
+| from_date | Записи после указанной даты | ?from_date=2026-05-01 |
+| to_date | Записи до указанной даты | ?to_date=2026-05-31 |
+| file_path | Частичное совпадение пути | ?file_path=video |
 
 ## 📁 Структура проекта
 
 ```
 encoder_project/
-├── http/
-│   ├── include/http/
-│   │   └── http_agent.hpp
-│   └── sources/
-│       ├── http_agent.cpp
-│       ├── http_handlers.cpp
-│       └── http_print.cpp
-├── db/
+├── http/                     # HTTP компонент
+│   ├── include/http/         # публичные заголовки
+│   └── sources/              # исходники
+├── db/                       # DB агент компонент
 │   ├── include/db/
-│   │   └── db_agent.hpp
 │   └── sources/
-│       └── db_agent.cpp
-├── ffmpeg/
+├── ffmpeg/                   # FFmpeg агент компонент
 │   ├── include/ffmpeg/
-│   │   └── ffmpeg_agent.hpp
 │   └── sources/
-│       └── ffmpeg_agent.cpp
-├── database/
-│   ├── include/database/
-│   │   └── database.hpp
-│   └── sources/
-│       └── database.cpp
-├── utils/
-│   └── include/utils/
-│       ├── logger.hpp
-│       ├── utils.hpp
-│       ├── colors.hpp
-│       ├── constants.hpp
-│       ├── cache.hpp
-│       └── rate_limiter.hpp
-├── encoder/
-│   └── sources/
-│       └── main.cpp
-├── messages/
+├── database/                 # База данных (PImpl)
+│   ├── include/database/     # Database (публичный)
+│   └── sources/              # Database + DatabaseImpl
+├── utils/                    # Утилиты
+│   └── include/utils/        # только заголовки
+├── messages/                 # Сообщения
 │   └── include/messages/
-│       └── messages.hpp
-├── include/
-│   └── httplib_wrapper.hpp
-├── scripts/
-│   ├── health.sh
-│   ├── create.sh
-│   ├── get.sh
-│   ├── get_vaa.sh
-│   ├── get_by_id.sh
-│   ├── delete.sh
-│   └── test_errors.sh
+├── encoder/                  # Точка входа
+│   └── sources/              # main.cpp
+├── tests/                    # Юнит-тесты
+├── scripts/                  # Bash скрипты
 ├── CMakeLists.txt
-├── conanfile.txt
-├── conanfile_win.txt
-├── build_local.sh
-├── rebuild_local.sh
+├── conanfile.txt             # для CI (новые версии)
+├── conanfile_win.txt         # для Windows (старые версии)
+├── build_local.sh            # локальная сборка
 └── README.md
 ```
 
 ## 📦 Зависимости
 
-- cpp-httplib/0.12.4
-- nlohmann_json/3.11.2
-- sobjectizer/5.7.5
-- sqlite3/3.45.1
-- FFmpeg (системный, через pacman или вручную)
+### Для CI (Linux)
+
+```
+cpp-httplib/0.39.0
+nlohmann_json/3.12.0
+sobjectizer/5.8.1
+sqlite3/3.53.0
+gtest/1.17.0
+```
+
+### Для локальной сборки (Windows)
+
+```
+cpp-httplib/0.14.3
+nlohmann_json/3.11.2
+sobjectizer/5.7.5
+sqlite3/3.45.1
+gtest/1.17.0
+```
+
+### Системные
+
+- FFmpeg (ffprobe) — для анализа видео
 
 ## 🎨 Цветной вывод
 
@@ -190,6 +187,7 @@ encoder_project/
 - [x] GET /api/v1/records/{id}
 - [x] DELETE /api/v1/records/{id}
 - [x] GET /health
+- [x] GET /api/v1/archive/records/{id}/vva_blocks
 - [x] Пагинация
 - [x] Сортировка
 - [x] Фильтрация
@@ -200,7 +198,12 @@ encoder_project/
 - [x] FFmpeg агент (реальный анализ видео через ffprobe)
 - [x] VAA блоки (сегментация видео и аудио по 10 секунд)
 - [x] Проверка существования файла (400)
-- [x] Индексы в БД для быстрых запросов
+- [x] Индексы в БД
+- [x] Кеширование
+- [x] Rate limiter
+- [x] PImpl для Database
+- [x] Юнит-тесты (GTest)
+- [x] Компонентная структура CMake
 
 ## VAA блоки
 
@@ -208,7 +211,7 @@ encoder_project/
 
 - Видео нарезается на сегменты по 10 секунд
 - Аудио нарезается на сегменты по 10 секунд
-- Блоки сохраняются в таблицу `vaa_blocks`
+- Блоки сохраняются в таблицу vaa_blocks
 
 ### Получение VAA блоков
 
@@ -243,17 +246,6 @@ encoder_project/
 | GET /api/v1/records/{id} | m_record_cache | 60 сек | POST/DELETE |
 | GET /api/v1/archive/records/{id}/vva_blocks | m_vaa_cache | бессрочно | POST/DELETE |
 
-## Новые скрипты
-
-```
-# Получение VAA блоков
-./scripts/get_vaa.sh <record_id> [limit] [offset]
-
-# Пример
-./scripts/get_vaa.sh 04cc951e-1c0f-4838-bc37-3d9d1c71b505
-./scripts/get_vaa.sh 04cc951e-1c0f-4838-bc37-3d9d1c71b505 5 0
-```
-
 ## 🏗 Как работает проект
 
 ### Архитектура
@@ -274,7 +266,7 @@ Client -> HTTP Agent -> FFmpeg Agent -> DB Agent -> SQLite3
 
 ### Полный цикл создания записи
 
-1. Пользователь отправляет POST запрос на `/api/v1/records` с JSON-данными
+1. Пользователь отправляет POST запрос на /api/v1/records с JSON-данными
 2. HTTP-агент валидирует UUID, block_size, fblock, streams
 3. HTTP-агент проверяет существование видеофайла (если нет — возвращает 400)
 4. HTTP-агент отправляет FFmpeg-агенту сообщение на анализ видео
@@ -292,6 +284,7 @@ Client -> HTTP Agent -> FFmpeg Agent -> DB Agent -> SQLite3
 | 400 | Неверный формат UUID, пустое тело, невалидный JSON, block_size ≤ 0, видеофайл не существует |
 | 404 | Запись с указанным ID не найдена |
 | 409 | Попытка создать запись с уже существующим ID |
+| 429 | Слишком много запросов (rate limiter) |
 | 504 | Таймаут ожидания ответа от агента |
 
 ### Технологический стек
@@ -303,6 +296,7 @@ Client -> HTTP Agent -> FFmpeg Agent -> DB Agent -> SQLite3
 - **nlohmann/json** — парсинг и сериализация JSON
 - **SQLite3** — база данных
 - **FFmpeg** — анализ видео (ffprobe)
+- **GTest** — юнит-тесты
 
 ## 🐳 Docker
 
@@ -331,3 +325,5 @@ Client -> HTTP Agent -> FFmpeg Agent -> DB Agent -> SQLite3
 - Флаг `--noproxy "localhost"` необходим при работе через корпоративный прокси
 - ID записи должен быть в формате UUID (например, `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`)
 - FFmpeg должен быть установлен и доступен в PATH (для работы ffprobe)
+EOF
+```
