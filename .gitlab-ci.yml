@@ -10,17 +10,22 @@ variables:
   CPP_CONAN_PROFILE: ubuntu2404-gcc13-relwithdebinfo
   CPP_CMAKE_PRESET: conan-relwithdebinfo
   CPP_VERSION_ENV_PREFIX: encoders_gag
-  CPP_CONAN_BUILD_POLICY: missing
+  CPP_CONAN_BUILD_POLICY: never
   CPP_CONAN_CONFIG_PROJECT: mirror/conan-config
   CPP_DOCKER_ROOTFS_DIR: docker-rootfs
 
   CONAN_HOME: "$CI_PROJECT_DIR/.conan2"
+  CONAN_NON_INTERACTIVE: "1"
+
+  CONAN_RECIPES_PROJECT_PATH: "rigel/infrastructure/cpp-conan-recipes"
+  CONAN_RECIPES_REF: "dev"
+  CONAN_RECIPES_DIR: "/tmp/cpp-conan-recipes"
+  CONAN_PACKAGE_NAME: "encoders_gag"
+  CONAN_RECIPE_DIR: "/tmp/cpp-conan-recipes/recipes/${CONAN_PACKAGE_NAME}"
+  CONAN_SOURCE_PATH: "${CI_PROJECT_DIR}"
 
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_SUBMODULE_FORCE_HTTPS: "true"
-
-  NO_PROXY: localhost,127.0.0.1,192.168.68.218,gitlab.rigel.bolid.ru
-  no_proxy: localhost,127.0.0.1,192.168.68.218,gitlab.rigel.bolid.ru
 
 .cpp_default:
   image: $CPP_BUILDER_IMAGE
@@ -29,8 +34,14 @@ variables:
 .cpp_conan_setup:
   extends: .cpp_default
   before_script:
+    - set -euo pipefail
     - git clone "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CPP_CONAN_CONFIG_PROJECT}.git" /tmp/conan-config
     - conan config install /tmp/conan-config
+
+    - rm -rf "${CONAN_RECIPES_DIR}"
+    - git clone --branch "${CONAN_RECIPES_REF}" --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CONAN_RECIPES_PROJECT_PATH}.git" "${CONAN_RECIPES_DIR}"
+    - test -f "${CONAN_RECIPE_DIR}/conanfile.py"
+    - test -f "${CONAN_SOURCE_PATH}/CMakeLists.txt"
 
     - export "${CPP_VERSION_ENV_PREFIX}_build_branch=$CI_COMMIT_REF_NAME"
     - export "${CPP_VERSION_ENV_PREFIX}_build_commit=$CI_COMMIT_SHA"
@@ -38,7 +49,17 @@ variables:
     - export "${CPP_VERSION_ENV_PREFIX}_build_version=0.0.0+$CI_COMMIT_SHORT_SHA"
 
 .cpp_conan_install: &cpp_conan_install
-  - conan install . -pr:h "$CPP_CONAN_PROFILE" -pr:b "$CPP_CONAN_PROFILE" --build="$CPP_CONAN_BUILD_POLICY"
+  - |
+    if [ -f conanfile.txt ] || [ -f conanfile.py ]; then
+      echo "WARN: repo contains conanfile for local development."
+      echo "WARN: CI ignores repo conanfile and uses DevOps recipe:"
+      echo "WARN: ${CONAN_RECIPE_DIR}/conanfile.py"
+      ls -la conanfile.* || true
+    fi
+  - export CONAN_SOURCE_PATH="${CI_PROJECT_DIR}"
+  - echo "CONAN_RECIPE_DIR=${CONAN_RECIPE_DIR}"
+  - echo "CONAN_SOURCE_PATH=${CONAN_SOURCE_PATH}"
+  - conan install "${CONAN_RECIPE_DIR}" --output-folder="${CI_PROJECT_DIR}" -pr:h "$CPP_CONAN_PROFILE" -pr:b "$CPP_CONAN_PROFILE" --build="$CPP_CONAN_BUILD_POLICY"
   - CONAN_BUILD_SH="$(find build -path '*/generators/conanbuild.sh' -print -quit)"
   - test -n "$CONAN_BUILD_SH" || { echo "conanbuild.sh not found"; find build -path '*/generators/*' -type f; exit 1; }
   - echo "CONAN_BUILD_SH=$CONAN_BUILD_SH"
