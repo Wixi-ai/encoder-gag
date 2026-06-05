@@ -1,0 +1,120 @@
+stages:
+  - build
+  - package
+
+variables:
+  CPP_BUILDER_IMAGE: "gitlab.rigel.bolid.ru:5050/mirror/imagegcc/ubuntu24.02-gcc13:0.5.0"
+  CPP_PACKAGE_IMAGE: "gitlab.rigel.bolid.ru:5050/rigel/build_repository:0.1.0"
+
+  CPP_BIN_NAME: controller
+  CPP_CONAN_PROFILE: ubuntu2404-gcc13-relwithdebinfo
+  CPP_CMAKE_PRESET: conan-relwithdebinfo
+  CPP_VERSION_ENV_PREFIX: controller
+  CPP_CONAN_BUILD_POLICY: missing
+  CPP_CONAN_CONFIG_PROJECT: mirror/conan-config
+  CPP_DOCKER_ROOTFS_DIR: docker-rootfs
+
+  CONAN_HOME: "$CI_PROJECT_DIR/.conan2"
+
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_FORCE_HTTPS: "true"
+
+  NO_PROXY: localhost,127.0.0.1,192.168.68.218,gitlab.rigel.bolid.ru
+  no_proxy: localhost,127.0.0.1,192.168.68.218,gitlab.rigel.bolid.ru
+
+.cpp_default:
+  image: $CPP_BUILDER_IMAGE
+  interruptible: true
+
+.cpp_conan_setup:
+  extends: .cpp_default
+  before_script:
+    - git clone "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CPP_CONAN_CONFIG_PROJECT}.git" /tmp/conan-config
+    - conan config install /tmp/conan-config
+
+    - export "${CPP_VERSION_ENV_PREFIX}_build_branch=$CI_COMMIT_REF_NAME"
+    - export "${CPP_VERSION_ENV_PREFIX}_build_commit=$CI_COMMIT_SHA"
+    - export "${CPP_VERSION_ENV_PREFIX}_build_number=$CI_PIPELINE_ID"
+    - export "${CPP_VERSION_ENV_PREFIX}_build_version=0.0.0+$CI_COMMIT_SHORT_SHA"
+
+.cpp_conan_install: &cpp_conan_install
+  - conan install . -pr:h "$CPP_CONAN_PROFILE" -pr:b "$CPP_CONAN_PROFILE" --build="$CPP_CONAN_BUILD_POLICY"
+  - CONAN_BUILD_SH="$(find build -path '*/generators/conanbuild.sh' -print -quit)"
+  - test -n "$CONAN_BUILD_SH" || { echo "conanbuild.sh not found"; find build -path '*/generators/*' -type f; exit 1; }
+  - echo "CONAN_BUILD_SH=$CONAN_BUILD_SH"
+  - source "$CONAN_BUILD_SH"
+  - echo "cmake_path=$(which cmake)"
+  - cmake --version
+
+.cpp_cmake_build: &cpp_cmake_build
+  - cmake --preset "$CPP_CMAKE_PRESET"
+  - cmake --build --preset "$CPP_CMAKE_PRESET" -j"$(nproc)"
+
+.cpp_cmake_test: &cpp_cmake_test
+  - ctest --preset "$CPP_CMAKE_PRESET" --output-on-failure
+
+.cpp_docker_rootfs: &cpp_docker_rootfs
+  - rm -rf "$CPP_DOCKER_ROOTFS_DIR"
+  - mkdir -p "$CPP_DOCKER_ROOTFS_DIR/app/lib"
+  - BIN_PATH="$(find build -type f -perm -111 -name "$CPP_BIN_NAME" -print -quit)"
+  - test -n "$BIN_PATH" || { echo "Binary $CPP_BIN_NAME not found"; find build -type f -perm -111; exit 1; }
+  - echo "BIN_PATH=$BIN_PATH"
+  - cp "$BIN_PATH" "$CPP_DOCKER_ROOTFS_DIR/app/$CPP_BIN_NAME"
+  - chmod +x "$CPP_DOCKER_ROOTFS_DIR/app/$CPP_BIN_NAME"
+  - ldd "$CPP_DOCKER_ROOTFS_DIR/app/$CPP_BIN_NAME" | awk '/=> \// {print $3} /^\// {print $1}' | sort -u | xargs -r cp -L -t "$CPP_DOCKER_ROOTFS_DIR/app/lib/"
+
+build-release:
+  stage: build
+  extends: .cpp_conan_setup
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_REF_NAME == "dev"
+    - if: $CI_COMMIT_REF_NAME =~ /^release.*$/
+  script:
+    - *cpp_conan_install
+    - *cpp_cmake_build
+    - *cpp_cmake_test
+    - *cpp_docker_rootfs
+  artifacts:
+    paths:
+      - $CPP_DOCKER_ROOTFS_DIR/
+    expire_in: 7 days
+
+package-image:
+  stage: package
+  image: $CPP_PACKAGE_IMAGE
+  needs:
+    - job: build-release
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "dev"'
+      variables:
+        TAG_SUFFIX: "_dev"
+    - if: '$CI_COMMIT_REF_NAME =~ /^release.*$/'
+      variables:
+        TAG_SUFFIX: ""
+  script:
+    - VERSION="$(tr -d '\r\n ' < VERSION)"
+    - TAG="$VERSION$TAG_SUFFIX"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build -f Dockerfile -t "$CI_REGISTRY_IMAGE:$VERSION" .
+    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$CI_REGISTRY_IMAGE:$TAG"
+    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:$TAG"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+
+publish-image-for-test:
+  stage: package
+  image: $CPP_PACKAGE_IMAGE
+  needs:
+    - job: build-release
+      artifacts: true
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+  script:
+    - VERSION="$(tr -d '\r\n ' < VERSION)"
+    - TAG="$VERSION-$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME-$CI_COMMIT_SHORT_SHA"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build -f Dockerfile -t "$CI_REGISTRY_IMAGE:$VERSION" .
+    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$CI_REGISTRY_IMAGE:$TAG"
+    - docker push "$CI_REGISTRY_IMAGE:$TAG"
