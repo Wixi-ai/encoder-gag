@@ -116,43 +116,57 @@ GET /api/v1/records поддерживает следующие параметр
 
 ```
 encoder_project/
-├── include/                          # Заголовочные файлы (.hpp)
-│   ├── colors.hpp                    # ANSI цвета для консоли
-│   ├── utils.hpp                     # Утилиты
-│   ├── database.hpp                  # Работа с SQLite3
-│   ├── messages.hpp                  # Структуры сообщений
-│   ├── logger.hpp                    # Логирование
-│   ├── constants.hpp                 # Константы
-│   ├── cache.hpp                     # Кеш для GET запросов
-│   └── agents/                       # Агенты (объявления)
-│       ├── db_agent.hpp
-│       ├── http_agent.hpp
-│       └── ffmpeg_agent.hpp
-│
-├── src/                              # Реализация (.cpp)
-│   ├── main.cpp
-│   ├── database.cpp
-│   └── agents/
-│       ├── db_agent.cpp
+├── http/
+│   ├── include/http/
+│   │   └── http_agent.hpp
+│   └── sources/
 │       ├── http_agent.cpp
 │       ├── http_handlers.cpp
-│       ├── http_print.cpp
+│       └── http_print.cpp
+├── db/
+│   ├── include/db/
+│   │   └── db_agent.hpp
+│   └── sources/
+│       └── db_agent.cpp
+├── ffmpeg/
+│   ├── include/ffmpeg/
+│   │   └── ffmpeg_agent.hpp
+│   └── sources/
 │       └── ffmpeg_agent.cpp
-│
-├── scripts/                          # Bash скрипты для тестирования
+├── database/
+│   ├── include/database/
+│   │   └── database.hpp
+│   └── sources/
+│       └── database.cpp
+├── utils/
+│   └── include/utils/
+│       ├── logger.hpp
+│       ├── utils.hpp
+│       ├── colors.hpp
+│       ├── constants.hpp
+│       ├── cache.hpp
+│       └── rate_limiter.hpp
+├── encoder/
+│   └── sources/
+│       └── main.cpp
+├── messages/
+│   └── include/messages/
+│       └── messages.hpp
+├── include/
+│   └── httplib_wrapper.hpp
+├── scripts/
 │   ├── health.sh
 │   ├── create.sh
 │   ├── get.sh
-│   ├── get_sorted.sh
+│   ├── get_vaa.sh
 │   ├── get_by_id.sh
 │   ├── delete.sh
 │   └── test_errors.sh
-│
 ├── CMakeLists.txt
 ├── conanfile.txt
-├── build.sh
-├── rebuild.sh
-├── start.sh
+├── conanfile_win.txt
+├── build_local.sh
+├── rebuild_local.sh
 └── README.md
 ```
 
