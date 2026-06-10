@@ -9,8 +9,12 @@
 #include <fstream>
 #include <cstdlib>
 #include <random>
+#include <mutex>
 
 using json = nlohmann::json;
+
+std::unordered_map<std::string, CachedVideoInfo> ffmpeg_agent_t::s_video_cache;
+std::mutex ffmpeg_agent_t::s_cache_mutex;
 
 static std::string msys2_to_win_path(const std::string& path) {
     if (path.empty()) return path;
@@ -65,6 +69,25 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
     params.success = false;
 
     std::string win_path = msys2_to_win_path(file_path);
+    
+    // Проверка кеша
+    {
+        std::lock_guard<std::mutex> lock(s_cache_mutex);
+        auto it = s_video_cache.find(win_path);
+        if (it != s_video_cache.end()) {
+            LOG_INFO("FFMPEG", "Cache hit: " + win_path);
+            params.codec = it->second.codec;
+            params.width = it->second.width;
+            params.height = it->second.height;
+            params.duration = it->second.duration;
+            params.success = true;
+            std::cout << COLOR_GREEN << "[" << current_time() << "] [FFMPEG] ✓ Video from cache: " 
+                      << params.width << "x" << params.height << " " << params.codec 
+                      << " duration=" << params.duration << "s" << COLOR_RESET << std::endl;
+            return params;
+        }
+    }
+
     LOG_INFO("FFMPEG", "Analyzing: " + win_path);
 
     FILE* f = fopen(win_path.c_str(), "rb");
@@ -75,11 +98,9 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
     }
     fclose(f);
 
-    // Используем временный файл для вывода
     std::string temp_file = "C:/Users/tungiia/ffprobe_out_" + random_string(8) + ".json";
-    std::string cmd = m_ffprobe_path + " -v quiet -print_format json -show_streams -show_format \"" + win_path + "\" > \"" + temp_file + "\" 2>&1";
+    std::string cmd = "\"" + m_ffprobe_path + "\" -v quiet -print_format json -show_streams -show_format \"" + win_path + "\" > \"" + temp_file + "\" 2>&1";
     
-    LOG_INFO("FFMPEG", "Running: " + cmd);
     int ret = std::system(cmd.c_str());
     
     if (ret != 0) {
@@ -88,7 +109,6 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
         return params;
     }
     
-    // Читаем результат из временного файла
     std::ifstream ifs(temp_file);
     if (!ifs.is_open()) {
         params.error_message = "Cannot open temp file: " + temp_file;
@@ -120,6 +140,11 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
             params.duration = std::stod(data["format"]["duration"].get<std::string>());
         }
         params.success = (params.width > 0 && params.height > 0);
+        
+        if (params.success) {
+            std::lock_guard<std::mutex> lock(s_cache_mutex);
+            s_video_cache[win_path] = {params.codec, params.width, params.height, params.duration};
+        }
         
         std::cout << COLOR_GREEN << "[" << current_time() << "] [FFMPEG] ✓ Video: " 
                   << params.width << "x" << params.height << " " << params.codec 

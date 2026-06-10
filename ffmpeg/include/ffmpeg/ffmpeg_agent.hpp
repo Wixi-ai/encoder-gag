@@ -4,10 +4,19 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <mutex>
 #include "messages/messages.hpp"
 #include "utils/colors.hpp"
 #include "utils/utils.hpp"
 #include "utils/logger.hpp"
+
+struct CachedVideoInfo {
+    std::string codec;
+    int width;
+    int height;
+    double duration;
+};
 
 class ffmpeg_agent_t : public so_5::agent_t {
 public:
@@ -25,4 +34,7 @@ private:
     so_5::mbox_t m_db_mbox;
     int m_processed_count;
     std::string m_ffprobe_path;
+    
+    static std::unordered_map<std::string, CachedVideoInfo> s_video_cache;
+    static std::mutex s_cache_mutex;
 };
