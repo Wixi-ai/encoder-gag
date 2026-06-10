@@ -50,10 +50,51 @@ Database::Database(const std::string& path)
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_vaa_blocks_record_id ON vaa_blocks(record_id);", nullptr, nullptr, nullptr);
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_record_files_record_id ON record_files(record_id);", nullptr, nullptr, nullptr);
     
+    prepareStatements(db);
+    
     std::cout << "[Database] Tables and indexes created" << std::endl;
 }
 
-Database::~Database() = default;
+Database::~Database() {
+    finalizeStatements();
+}
+
+void Database::prepareStatements(sqlite3* db) {
+    // INSERT records
+    sqlite3_prepare_v2(db, "INSERT INTO records (id, block_size, fblock, codec) VALUES (?, ?, ?, ?);",
+                       -1, &insert_record_stmt_, nullptr);
+    // INSERT record_files
+    sqlite3_prepare_v2(db, "INSERT INTO record_files (record_id, stream_id, stream_type, begin_time, file_path) VALUES (?, ?, ?, ?, ?);",
+                       -1, &insert_record_file_stmt_, nullptr);
+    // INSERT vaa_blocks
+    sqlite3_prepare_v2(db, "INSERT INTO vaa_blocks (record_id, block_index, block_type, pts, duration, data) VALUES (?, ?, ?, ?, ?, ?);",
+                       -1, &insert_vaa_block_stmt_, nullptr);
+    // DELETE record
+    sqlite3_prepare_v2(db, "DELETE FROM records WHERE id = ?;", -1, &delete_record_stmt_, nullptr);
+    // GET record by id
+    sqlite3_prepare_v2(db, "SELECT id, file_path, created_at FROM records WHERE id = ?;", -1, &get_record_by_id_stmt_, nullptr);
+    // GET total records count
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM records;", -1, &get_total_records_count_stmt_, nullptr);
+    // GET total vaa blocks count
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM vaa_blocks;", -1, &get_total_vaa_blocks_count_stmt_, nullptr);
+    // GET vaa blocks count by record_id
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM vaa_blocks WHERE record_id = ?;", -1, &get_vaa_blocks_count_stmt_, nullptr);
+    // GET vaa blocks
+    sqlite3_prepare_v2(db, "SELECT block_index, block_type, pts, duration, data FROM vaa_blocks WHERE record_id = ? ORDER BY block_index LIMIT ? OFFSET ?;",
+                       -1, &get_vaa_blocks_stmt_, nullptr);
+}
+
+void Database::finalizeStatements() {
+    if (insert_record_stmt_) sqlite3_finalize(insert_record_stmt_);
+    if (insert_record_file_stmt_) sqlite3_finalize(insert_record_file_stmt_);
+    if (insert_vaa_block_stmt_) sqlite3_finalize(insert_vaa_block_stmt_);
+    if (delete_record_stmt_) sqlite3_finalize(delete_record_stmt_);
+    if (get_record_by_id_stmt_) sqlite3_finalize(get_record_by_id_stmt_);
+    if (get_total_records_count_stmt_) sqlite3_finalize(get_total_records_count_stmt_);
+    if (get_total_vaa_blocks_count_stmt_) sqlite3_finalize(get_total_vaa_blocks_count_stmt_);
+    if (get_vaa_blocks_count_stmt_) sqlite3_finalize(get_vaa_blocks_count_stmt_);
+    if (get_vaa_blocks_stmt_) sqlite3_finalize(get_vaa_blocks_stmt_);
+}
 
 sqlite3* Database::getDb() const { 
     auto* non_const_this = const_cast<Database*>(this);
@@ -65,21 +106,13 @@ bool Database::saveRecord(const RecordCreateRequest& request) {
     auto conn = pool_->acquire();
     sqlite3* db = conn->get();
     
-    const char* record_sql = "INSERT INTO records (id, block_size, fblock, codec) VALUES (?, ?, ?, ?);";
-    sqlite3_stmt* stmt;
+    sqlite3_bind_text(insert_record_stmt_, 1, request.id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(insert_record_stmt_, 2, request.block_size);
+    sqlite3_bind_int(insert_record_stmt_, 3, request.fblock);
+    sqlite3_bind_text(insert_record_stmt_, 4, "h264", -1, SQLITE_STATIC);
     
-    if (sqlite3_prepare_v2(db, record_sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        std::cerr << "[Database] Prepare error: " << sqlite3_errmsg(db) << std::endl;
-        return false;
-    }
-    
-    sqlite3_bind_text(stmt, 1, request.id.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 2, request.block_size);
-    sqlite3_bind_int(stmt, 3, request.fblock);
-    sqlite3_bind_text(stmt, 4, "h264", -1, SQLITE_STATIC);
-    
-    int rc = sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
+    int rc = sqlite3_step(insert_record_stmt_);
+    sqlite3_reset(insert_record_stmt_);
     
     if (rc != SQLITE_DONE) {
         if (rc == SQLITE_CONSTRAINT) {
@@ -90,21 +123,17 @@ bool Database::saveRecord(const RecordCreateRequest& request) {
         return false;
     }
     
-    const char* file_sql = "INSERT INTO record_files (record_id, stream_id, stream_type, begin_time, file_path) VALUES (?, ?, ?, ?, ?);";
-    
     for (const auto& stream : request.streams) {
         for (const auto& file : stream.files) {
-            if (sqlite3_prepare_v2(db, file_sql, -1, &stmt, nullptr) != SQLITE_OK) {
-                std::cerr << "[Database] Prepare file error: " << sqlite3_errmsg(db) << std::endl;
-                continue;
-            }
-            sqlite3_bind_text(stmt, 1, request.id.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int(stmt, 2, stream.id);
-            sqlite3_bind_text(stmt, 3, stream.type.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 4, file.begin.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 5, file.path.c_str(), -1, SQLITE_STATIC);
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
+            sqlite3_bind_text(insert_record_file_stmt_, 1, request.id.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_int(insert_record_file_stmt_, 2, stream.id);
+            sqlite3_bind_text(insert_record_file_stmt_, 3, stream.type.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(insert_record_file_stmt_, 4, file.begin.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(insert_record_file_stmt_, 5, file.path.c_str(), -1, SQLITE_STATIC);
+            
+            rc = sqlite3_step(insert_record_file_stmt_);
+            sqlite3_reset(insert_record_file_stmt_);
+            
             if (rc != SQLITE_DONE) {
                 std::cerr << "[Database] File insert error: " << sqlite3_errmsg(db) << std::endl;
             }
@@ -176,25 +205,25 @@ std::vector<std::pair<std::string, std::string>> Database::getFilteredRecords(in
 
 int Database::getTotalRecordsCount() {
     auto conn = pool_->acquire();
-    sqlite3* db = conn->get();
-    const char* sql = "SELECT COUNT(*) FROM records;";
-    sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return 0;
+    sqlite3_reset(get_total_records_count_stmt_);
+    
     int count = 0;
-    if (sqlite3_step(stmt) == SQLITE_ROW) count = sqlite3_column_int(stmt, 0);
-    sqlite3_finalize(stmt);
+    if (sqlite3_step(get_total_records_count_stmt_) == SQLITE_ROW) {
+        count = sqlite3_column_int(get_total_records_count_stmt_, 0);
+    }
+    sqlite3_reset(get_total_records_count_stmt_);
     return count;
 }
 
 int Database::getTotalVaaBlocksCount() {
     auto conn = pool_->acquire();
-    sqlite3* db = conn->get();
-    const char* sql = "SELECT COUNT(*) FROM vaa_blocks;";
-    sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return 0;
+    sqlite3_reset(get_total_vaa_blocks_count_stmt_);
+    
     int count = 0;
-    if (sqlite3_step(stmt) == SQLITE_ROW) count = sqlite3_column_int(stmt, 0);
-    sqlite3_finalize(stmt);
+    if (sqlite3_step(get_total_vaa_blocks_count_stmt_) == SQLITE_ROW) {
+        count = sqlite3_column_int(get_total_vaa_blocks_count_stmt_, 0);
+    }
+    sqlite3_reset(get_total_vaa_blocks_count_stmt_);
     return count;
 }
 
@@ -223,32 +252,31 @@ std::pair<std::string, std::string> Database::getRecordTimeRange(const std::stri
 std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(const std::string& id) const {
     auto* non_const_this = const_cast<Database*>(this);
     auto conn = non_const_this->pool_->acquire();
-    sqlite3* db = conn->get();
-    const char* sql = "SELECT id, file_path, created_at FROM records WHERE id = ?;";
-    sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return {false, "", "", ""};
-    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        std::string found_id = (const char*)sqlite3_column_text(stmt, 0);
-        std::string path = (const char*)sqlite3_column_text(stmt, 1) ?: "";
-        std::string created = (const char*)sqlite3_column_text(stmt, 2);
-        sqlite3_finalize(stmt);
+    
+    sqlite3_reset(get_record_by_id_stmt_);
+    sqlite3_bind_text(get_record_by_id_stmt_, 1, id.c_str(), -1, SQLITE_STATIC);
+    
+    if (sqlite3_step(get_record_by_id_stmt_) == SQLITE_ROW) {
+        std::string found_id = (const char*)sqlite3_column_text(get_record_by_id_stmt_, 0);
+        std::string path = (const char*)sqlite3_column_text(get_record_by_id_stmt_, 1) ?: "";
+        std::string created = (const char*)sqlite3_column_text(get_record_by_id_stmt_, 2);
+        sqlite3_reset(get_record_by_id_stmt_);
         return {true, found_id, path, created};
     }
-    sqlite3_finalize(stmt);
+    sqlite3_reset(get_record_by_id_stmt_);
     return {false, "", "", ""};
 }
 
 bool Database::deleteRecordById(const std::string& id) {
     auto conn = pool_->acquire();
-    sqlite3* db = conn->get();
-    const char* delete_record_sql = "DELETE FROM records WHERE id = ?;";
-    sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(db, delete_record_sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-    int rc = sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-    if (rc == SQLITE_DONE && sqlite3_changes(db) > 0) {
+    
+    sqlite3_reset(delete_record_stmt_);
+    sqlite3_bind_text(delete_record_stmt_, 1, id.c_str(), -1, SQLITE_STATIC);
+    
+    int rc = sqlite3_step(delete_record_stmt_);
+    sqlite3_reset(delete_record_stmt_);
+    
+    if (rc == SQLITE_DONE && sqlite3_changes(conn->get()) > 0) {
         std::cout << "[Database] Record deleted: " << id << std::endl;
         return true;
     }
@@ -268,60 +296,58 @@ std::tuple<std::vector<VideoStream>, std::vector<AudioStream>> Database::getStre
 
 bool Database::saveVaaBlocks(const std::string& record_id, const std::vector<VaaBlock>& blocks) {
     auto conn = pool_->acquire();
-    sqlite3* db = conn->get();
-    const char* sql = "INSERT INTO vaa_blocks (record_id, block_index, block_type, pts, duration, data) VALUES (?, ?, ?, ?, ?, ?);";
-    sqlite3_stmt* stmt;
+    
     for (const auto& block : blocks) {
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
-        sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int(stmt, 2, block.index);
-        sqlite3_bind_text(stmt, 3, block.type.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int64(stmt, 4, block.pts);
-        sqlite3_bind_int64(stmt, 5, block.duration);
-        sqlite3_bind_text(stmt, 6, block.data.c_str(), -1, SQLITE_STATIC);
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
+        sqlite3_reset(insert_vaa_block_stmt_);
+        sqlite3_bind_text(insert_vaa_block_stmt_, 1, record_id.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int(insert_vaa_block_stmt_, 2, block.index);
+        sqlite3_bind_text(insert_vaa_block_stmt_, 3, block.type.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int64(insert_vaa_block_stmt_, 4, block.pts);
+        sqlite3_bind_int64(insert_vaa_block_stmt_, 5, block.duration);
+        sqlite3_bind_text(insert_vaa_block_stmt_, 6, block.data.c_str(), -1, SQLITE_STATIC);
+        
+        if (sqlite3_step(insert_vaa_block_stmt_) != SQLITE_DONE) {
+            std::cerr << "[Database] Insert VAA error" << std::endl;
             return false;
         }
-        sqlite3_finalize(stmt);
     }
+    sqlite3_reset(insert_vaa_block_stmt_);
     std::cout << "[Database] Saved " << blocks.size() << " VAA blocks for record " << record_id << std::endl;
     return true;
 }
 
 std::vector<VaaBlock> Database::getVaaBlocks(const std::string& record_id, int limit, int offset) {
     auto conn = pool_->acquire();
-    sqlite3* db = conn->get();
     std::vector<VaaBlock> blocks;
-    const char* sql = "SELECT block_index, block_type, pts, duration, data FROM vaa_blocks WHERE record_id = ? ORDER BY block_index LIMIT ? OFFSET ?;";
-    sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return blocks;
-    sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 2, limit);
-    sqlite3_bind_int(stmt, 3, offset);
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    
+    sqlite3_reset(get_vaa_blocks_stmt_);
+    sqlite3_bind_text(get_vaa_blocks_stmt_, 1, record_id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(get_vaa_blocks_stmt_, 2, limit);
+    sqlite3_bind_int(get_vaa_blocks_stmt_, 3, offset);
+    
+    while (sqlite3_step(get_vaa_blocks_stmt_) == SQLITE_ROW) {
         VaaBlock block;
-        block.index = sqlite3_column_int(stmt, 0);
-        block.type = (const char*)sqlite3_column_text(stmt, 1);
-        block.pts = sqlite3_column_int64(stmt, 2);
-        block.duration = sqlite3_column_int64(stmt, 3);
-        block.data = (const char*)sqlite3_column_text(stmt, 4) ?: "";
+        block.index = sqlite3_column_int(get_vaa_blocks_stmt_, 0);
+        block.type = (const char*)sqlite3_column_text(get_vaa_blocks_stmt_, 1);
+        block.pts = sqlite3_column_int64(get_vaa_blocks_stmt_, 2);
+        block.duration = sqlite3_column_int64(get_vaa_blocks_stmt_, 3);
+        block.data = (const char*)sqlite3_column_text(get_vaa_blocks_stmt_, 4) ?: "";
         blocks.push_back(block);
     }
-    sqlite3_finalize(stmt);
+    sqlite3_reset(get_vaa_blocks_stmt_);
     return blocks;
 }
 
 int Database::getVaaBlocksCount(const std::string& record_id) {
     auto conn = pool_->acquire();
-    sqlite3* db = conn->get();
-    const char* sql = "SELECT COUNT(*) FROM vaa_blocks WHERE record_id = ?;";
-    sqlite3_stmt* stmt;
+    
+    sqlite3_reset(get_vaa_blocks_count_stmt_);
+    sqlite3_bind_text(get_vaa_blocks_count_stmt_, 1, record_id.c_str(), -1, SQLITE_STATIC);
+    
     int count = 0;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
-        sqlite3_bind_text(stmt, 1, record_id.c_str(), -1, SQLITE_STATIC);
-        if (sqlite3_step(stmt) == SQLITE_ROW) count = sqlite3_column_int(stmt, 0);
-        sqlite3_finalize(stmt);
+    if (sqlite3_step(get_vaa_blocks_count_stmt_) == SQLITE_ROW) {
+        count = sqlite3_column_int(get_vaa_blocks_count_stmt_, 0);
     }
+    sqlite3_reset(get_vaa_blocks_count_stmt_);
     return count;
 }

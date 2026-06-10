@@ -31,4 +31,20 @@ public:
 
 private:
     std::unique_ptr<ConnectionPool> pool_;
+    
+    // Подготовленные выражения
+    sqlite3_stmt* insert_record_stmt_ = nullptr;
+    sqlite3_stmt* insert_record_file_stmt_ = nullptr;
+    sqlite3_stmt* insert_vaa_block_stmt_ = nullptr;
+    sqlite3_stmt* get_filtered_count_stmt_ = nullptr;
+    sqlite3_stmt* get_filtered_records_stmt_ = nullptr;
+    sqlite3_stmt* get_total_records_count_stmt_ = nullptr;
+    sqlite3_stmt* get_record_by_id_stmt_ = nullptr;
+    sqlite3_stmt* delete_record_stmt_ = nullptr;
+    sqlite3_stmt* get_vaa_blocks_stmt_ = nullptr;
+    sqlite3_stmt* get_vaa_blocks_count_stmt_ = nullptr;
+    sqlite3_stmt* get_total_vaa_blocks_count_stmt_ = nullptr;
+    
+    void prepareStatements(sqlite3* db);
+    void finalizeStatements();
 };
