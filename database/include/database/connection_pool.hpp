@@ -23,6 +23,7 @@ public:
     };
     
     std::unique_ptr<Connection> acquire();
+    sqlite3* getSingleConnection() { return single_connection_; }
     
 private:
     friend class Connection;
@@ -30,7 +31,9 @@ private:
     
     std::string db_path_;
     int pool_size_;
+    sqlite3* single_connection_ = nullptr;
     std::queue<sqlite3*> connections_;
     std::mutex mutex_;
     std::condition_variable cv_;
+    bool is_memory_;
 };

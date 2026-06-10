@@ -7,7 +7,6 @@
 Database::Database(const std::string& path) 
     : pool_(std::make_unique<ConnectionPool>(path, 5)) 
 {
-    // Создаём таблицы и индексы через первое соединение
     auto conn = pool_->acquire();
     sqlite3* db = conn->get();
     
@@ -56,7 +55,11 @@ Database::Database(const std::string& path)
 
 Database::~Database() = default;
 
-sqlite3* Database::getDb() const { return nullptr; } // Не используется, соединения из пула
+sqlite3* Database::getDb() const { 
+    auto* non_const_this = const_cast<Database*>(this);
+    auto conn = non_const_this->pool_->acquire();
+    return conn->get(); 
+}
 
 bool Database::saveRecord(const RecordCreateRequest& request) {
     auto conn = pool_->acquire();
@@ -218,7 +221,6 @@ std::pair<std::string, std::string> Database::getRecordTimeRange(const std::stri
 }
 
 std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(const std::string& id) const {
-    // Для const методов нужно получить mutable пул
     auto* non_const_this = const_cast<Database*>(this);
     auto conn = non_const_this->pool_->acquire();
     sqlite3* db = conn->get();
