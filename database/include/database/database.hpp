@@ -7,7 +7,7 @@
 #include <tuple>
 #include "messages/messages.hpp"
 
-class DatabaseImpl;
+class ConnectionPool;
 
 class Database {
 public:
@@ -26,8 +26,9 @@ public:
     bool saveVaaBlocks(const std::string& record_id, const std::vector<VaaBlock>& blocks);
     std::vector<VaaBlock> getVaaBlocks(const std::string& record_id, int limit, int offset);
     int getVaaBlocksCount(const std::string& record_id);
+    int getTotalVaaBlocksCount();
     sqlite3* getDb() const;
 
 private:
-    std::unique_ptr<DatabaseImpl> pImpl;
+    std::unique_ptr<ConnectionPool> pool_;
 };

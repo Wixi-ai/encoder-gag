@@ -1,6 +1,6 @@
 add_library(database_lib STATIC
     sources/database.cpp
-    sources/database_impl.cpp
+    sources/connection_pool.cpp
 )
 
 target_include_directories(database_lib PUBLIC

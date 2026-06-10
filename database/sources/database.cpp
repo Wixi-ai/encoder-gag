@@ -1,16 +1,67 @@
 #include "database/database.hpp"
-#include "database/database_impl.hpp"
+#include "database/connection_pool.hpp"
 #include "utils/colors.hpp"
 #include <iostream>
 #include <sstream>
 
-Database::Database(const std::string& path) : pImpl(std::make_unique<DatabaseImpl>(path)) {}
+Database::Database(const std::string& path) 
+    : pool_(std::make_unique<ConnectionPool>(path, 5)) 
+{
+    // Создаём таблицы и индексы через первое соединение
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
+    
+    const char* sql = R"(
+        CREATE TABLE IF NOT EXISTS records (
+            id TEXT PRIMARY KEY,
+            file_path TEXT,
+            codec TEXT DEFAULT 'h264',
+            block_size INTEGER DEFAULT 0,
+            fblock INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS record_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id TEXT NOT NULL,
+            stream_id INTEGER NOT NULL,
+            stream_type TEXT NOT NULL,
+            begin_time TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS vaa_blocks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id TEXT NOT NULL,
+            block_index INTEGER NOT NULL,
+            block_type TEXT NOT NULL,
+            pts INTEGER NOT NULL,
+            duration INTEGER NOT NULL,
+            data TEXT NOT NULL,
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        );
+    )";
+    
+    char* errMsg = nullptr;
+    sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
+    if (errMsg) {
+        std::cerr << "[Database] Error: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
+    }
+    
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_vaa_blocks_record_id ON vaa_blocks(record_id);", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_record_files_record_id ON record_files(record_id);", nullptr, nullptr, nullptr);
+    
+    std::cout << "[Database] Tables and indexes created" << std::endl;
+}
+
 Database::~Database() = default;
 
-sqlite3* Database::getDb() const { return pImpl->getDb(); }
+sqlite3* Database::getDb() const { return nullptr; } // Не используется, соединения из пула
 
 bool Database::saveRecord(const RecordCreateRequest& request) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
+    
     const char* record_sql = "INSERT INTO records (id, block_size, fblock, codec) VALUES (?, ?, ?, ?);";
     sqlite3_stmt* stmt;
     
@@ -62,7 +113,9 @@ bool Database::saveRecord(const RecordCreateRequest& request) {
 }
 
 int Database::getFilteredCount(const std::string& codec, const std::string& from_date, const std::string& to_date, const std::string& file_path) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
+    
     std::string sql = "SELECT COUNT(*) FROM records WHERE 1=1";
     if (!codec.empty()) sql += " AND codec = '" + codec + "'";
     if (!from_date.empty()) sql += " AND date(created_at) >= '" + from_date + "'";
@@ -82,7 +135,9 @@ int Database::getFilteredCount(const std::string& codec, const std::string& from
 }
 
 std::vector<std::pair<std::string, std::string>> Database::getFilteredRecords(int limit, int offset, const std::string& sort_by, const std::string& sort_order, const std::string& codec, const std::string& from_date, const std::string& to_date, const std::string& file_path) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
+    
     std::vector<std::pair<std::string, std::string>> records;
     
     std::string valid_sort_by = "created_at";
@@ -117,8 +172,21 @@ std::vector<std::pair<std::string, std::string>> Database::getFilteredRecords(in
 }
 
 int Database::getTotalRecordsCount() {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
     const char* sql = "SELECT COUNT(*) FROM records;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return 0;
+    int count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) count = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    return count;
+}
+
+int Database::getTotalVaaBlocksCount() {
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
+    const char* sql = "SELECT COUNT(*) FROM vaa_blocks;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return 0;
     int count = 0;
@@ -132,7 +200,8 @@ std::vector<std::pair<std::string, std::string>> Database::getAllRecords(int lim
 }
 
 std::pair<std::string, std::string> Database::getRecordTimeRange(const std::string& record_id) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
     const char* sql = "SELECT MIN(begin_time), MAX(begin_time) FROM record_files WHERE record_id = ?;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return {"", ""};
@@ -149,7 +218,10 @@ std::pair<std::string, std::string> Database::getRecordTimeRange(const std::stri
 }
 
 std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(const std::string& id) const {
-    sqlite3* db = pImpl->getDb();
+    // Для const методов нужно получить mutable пул
+    auto* non_const_this = const_cast<Database*>(this);
+    auto conn = non_const_this->pool_->acquire();
+    sqlite3* db = conn->get();
     const char* sql = "SELECT id, file_path, created_at FROM records WHERE id = ?;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return {false, "", "", ""};
@@ -166,7 +238,8 @@ std::tuple<bool, std::string, std::string, std::string> Database::getRecordById(
 }
 
 bool Database::deleteRecordById(const std::string& id) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
     const char* delete_record_sql = "DELETE FROM records WHERE id = ?;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db, delete_record_sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
@@ -192,7 +265,8 @@ std::tuple<std::vector<VideoStream>, std::vector<AudioStream>> Database::getStre
 }
 
 bool Database::saveVaaBlocks(const std::string& record_id, const std::vector<VaaBlock>& blocks) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
     const char* sql = "INSERT INTO vaa_blocks (record_id, block_index, block_type, pts, duration, data) VALUES (?, ?, ?, ?, ?, ?);";
     sqlite3_stmt* stmt;
     for (const auto& block : blocks) {
@@ -214,7 +288,8 @@ bool Database::saveVaaBlocks(const std::string& record_id, const std::vector<Vaa
 }
 
 std::vector<VaaBlock> Database::getVaaBlocks(const std::string& record_id, int limit, int offset) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
     std::vector<VaaBlock> blocks;
     const char* sql = "SELECT block_index, block_type, pts, duration, data FROM vaa_blocks WHERE record_id = ? ORDER BY block_index LIMIT ? OFFSET ?;";
     sqlite3_stmt* stmt;
@@ -236,7 +311,8 @@ std::vector<VaaBlock> Database::getVaaBlocks(const std::string& record_id, int l
 }
 
 int Database::getVaaBlocksCount(const std::string& record_id) {
-    sqlite3* db = pImpl->getDb();
+    auto conn = pool_->acquire();
+    sqlite3* db = conn->get();
     const char* sql = "SELECT COUNT(*) FROM vaa_blocks WHERE record_id = ?;";
     sqlite3_stmt* stmt;
     int count = 0;
