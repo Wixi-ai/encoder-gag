@@ -48,3 +48,5 @@ private:
     void prepareStatements(sqlite3* db);
     void finalizeStatements();
 };
+    int getTotalRecordsCount();
+    int getTotalVaaBlocksCount();

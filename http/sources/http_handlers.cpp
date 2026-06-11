@@ -571,3 +571,42 @@ void http_agent_t::handleGetVaaBlocks(const std::string &id, const httplib::Requ
     res.status = 200;
     printResponse(res.status, j.dump().substr(0, 60) + "...");
 }
+
+void http_agent_t::handleGetStats(const httplib::Request& req, httplib::Response& res)
+{
+    static RateLimiter limiter;
+    if (!limiter.allow(req.remote_addr)) {
+        res.status = 429;
+        res.set_content("{\"error\": \"too many requests\"}", "application/json");
+        return;
+    }
+    
+    int req_id = ++m_request_id_counter;
+    auto promise = std::make_shared<std::promise<msg_get_records_response>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard<std::mutex> lock(m_pending_mutex);
+        m_pending_requests[req_id] = promise;
+    }
+    
+    so_5::send<msg_get_records>(m_db_mbox, req_id, 1, 0, "created_at", "asc", "", "", "", "", so_direct_mbox());
+    
+    if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+        res.set_content("{\"error\": \"timeout\"}", "application/json");
+        res.status = 504;
+        return;
+    }
+    
+    auto response = future.get();
+    
+    nlohmann::json j;
+    j["total_records"] = response.total;
+    j["uptime_seconds"] = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - start_time).count();
+    j["requests_total"] = m_request_counter;
+    
+    res.set_content(j.dump(), "application/json");
+    res.status = 200;
+    printResponse(res.status, j.dump());
+    LOG_INFO("HTTP", "Stats returned");
+}

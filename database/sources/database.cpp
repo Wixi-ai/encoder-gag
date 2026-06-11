@@ -351,3 +351,4 @@ int Database::getVaaBlocksCount(const std::string& record_id) {
     sqlite3_reset(get_vaa_blocks_count_stmt_);
     return count;
 }
+

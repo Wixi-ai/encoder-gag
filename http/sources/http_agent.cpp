@@ -111,6 +111,11 @@ void http_agent_t::so_evt_start()
     m_server->Get(R"(/api/v1/archive/records/([a-f0-9-]+)/vva_blocks)", [this](const httplib::Request &req, httplib::Response &res)
                   { handleGetVaaBlocks(req.matches[1], req, res); });
 
+    m_server->Get("/stats", [this](const httplib::Request& req, httplib::Response& res) {
+
+        handleGetStats(req, res);
+
+    });
     m_server->Get("/health", [this](const httplib::Request &, httplib::Response &res)
                   {
         auto now = std::chrono::steady_clock::now();
