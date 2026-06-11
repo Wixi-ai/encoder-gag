@@ -40,8 +40,17 @@ void http_agent_t::printStartupInfo()
     std::cout << COLOR_MAGENTA << "\n"
               << "  +------------------------------------------------------------------------------+\n"
               << "  |  FFMPEG AGENT ACTIVE                                                         |\n"
-              << "  |    - Real video analysis via ffprobe (codec, resolution, duration)          |\n"
+              << "  |    - Real video analysis via ffprobe                                         |\n"
               << "  |    - VAA blocks generation (10-second segments)                              |\n"
+              << "  |    - ffprobe cache: enabled (results cached by file path)                   |\n"
+              << "  +------------------------------------------------------------------------------+\n"
+              << COLOR_RESET;
+
+    std::cout << COLOR_BLUE << "\n"
+              << "  +------------------------------------------------------------------------------+\n"
+              << "  |  DATABASE POOL                                                               |\n"
+              << "  |    - Connection pool: 5 connections                                         |\n"
+              << "  |    - Prepared statements: enabled                                           |\n"
               << "  +------------------------------------------------------------------------------+\n"
               << COLOR_RESET;
 

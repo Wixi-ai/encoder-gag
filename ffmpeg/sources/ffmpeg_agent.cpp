@@ -18,7 +18,11 @@ std::mutex ffmpeg_agent_t::s_cache_mutex;
 
 static std::string msys2_to_win_path(const std::string& path) {
     if (path.empty()) return path;
-    if (path.length() > 2 && path[1] == ':') return path;
+    // Уже Windows путь
+    if (path.length() > 2 && path[1] == ':') {
+        return path;
+    }
+    // Конвертация /c/path -> C:/path
     if (path.length() > 2 && path[0] == '/' && isalpha(path[1])) {
         std::string drive = path.substr(1, 1);
         drive[0] = toupper(drive[0]);
@@ -42,7 +46,7 @@ static std::string random_string(int len) {
 }
 
 static std::string get_ffprobe_path() {
-    return "C:/Users/tungiia/ffmpeg-release/ffmpeg-8.1.1-essentials_build/bin/ffprobe.exe";
+    return "C:/tools/ffprobe.exe";
 }
 
 ffmpeg_agent_t::ffmpeg_agent_t(context_t ctx, so_5::mbox_t db_mbox)
@@ -90,6 +94,7 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
 
     LOG_INFO("FFMPEG", "Analyzing: " + win_path);
 
+    // Проверяем существование файла через stat
     FILE* f = fopen(win_path.c_str(), "rb");
     if (!f) {
         params.error_message = "File not found: " + win_path;
@@ -98,8 +103,11 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
     }
     fclose(f);
 
+    // Используем временный файл с простыми кавычками
     std::string temp_file = "C:/Users/tungiia/ffprobe_out_" + random_string(8) + ".json";
-    std::string cmd = "\"" + m_ffprobe_path + "\" -v quiet -print_format json -show_streams -show_format \"" + win_path + "\" > \"" + temp_file + "\" 2>&1";
+    std::string cmd = m_ffprobe_path + " -v quiet -print_format json -show_streams -show_format " + win_path + " > " + temp_file + " 2>&1";
+    
+    LOG_INFO("FFMPEG", "Running: " + cmd);
     
     int ret = std::system(cmd.c_str());
     
