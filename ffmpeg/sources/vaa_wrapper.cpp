@@ -5,6 +5,12 @@
 #include <random>
 #include <iostream>
 
+#ifdef _WIN32
+#include <windows.h>
+#define popen _popen
+#define pclose _pclose
+#endif
+
 using json = nlohmann::json;
 
 namespace vaa_wrapper {
@@ -29,6 +35,20 @@ static std::string get_ffprobe_path() {
         }
     }
     return "ffprobe";
+}
+
+static std::string exec_cmd(const std::string& cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+        return "";
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        result += buffer.data();
+    }
+    pclose(pipe);
+    return result;
 }
 
 static std::string random_string(int len) {
@@ -85,12 +105,10 @@ std::vector<VaaBlockData> generateBlocksForFile(
     std::vector<VaaBlockData> blocks;
     int block_count = std::max(1, (duration_seconds + 9) / 10);
     
-    // Генерируем видео блоки
     for (int i = 0; i < block_count; i++) {
         blocks.push_back(createBlock(block_counter++, "video", i * 10 * 1000, 10000));
     }
     
-    // Генерируем аудио блоки
     for (int i = 0; i < block_count; i++) {
         blocks.push_back(createBlock(block_counter++, "audio", i * 10 * 1000, 10000));
     }

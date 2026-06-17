@@ -12,6 +12,12 @@
 #include <random>
 #include <mutex>
 
+#ifdef _WIN32
+#include <windows.h>
+#define popen _popen
+#define pclose _pclose
+#endif
+
 using json = nlohmann::json;
 
 std::unordered_map<std::string, CachedVideoInfo> ffmpeg_agent_t::s_video_cache;
@@ -81,6 +87,20 @@ void ffmpeg_agent_t::so_define_agent() {
     so_subscribe_self().event([this](const msg_create_vaa_blocks &msg) { handleCreateVaaBlocks(msg); });
 }
 
+static std::string exec_cmd(const std::string& cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+        return "";
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        result += buffer.data();
+    }
+    pclose(pipe);
+    return result;
+}
+
 msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, const std::string &record_id, int request_id) {
     msg_video_params params;
     params.request_id = request_id;
@@ -118,15 +138,7 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
     fclose(f);
 
     std::string cmd = m_ffprobe_path + " -v quiet -print_format json -show_streams -show_format " + win_path;
-    
-    std::array<char, 128> buffer;
-    std::string output;
-    std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(cmd.c_str(), "r"), _pclose);
-    if (pipe) {
-        while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-            output += buffer.data();
-        }
-    }
+    std::string output = exec_cmd(cmd);
     
     if (output.empty()) {
         params.error_message = "ffprobe returned empty output";
@@ -175,11 +187,9 @@ void ffmpeg_agent_t::handleProcessVideo(const msg_process_video &msg) {
         int block_counter = 0;
         std::vector<vaa_wrapper::VaaBlockData> block_data;
         
-        // Используем обёртку для генерации блоков
         auto new_blocks = vaa_wrapper::generateBlocksForFile(msg.file_path, msg.record_id, static_cast<int>(params.duration), block_counter);
         block_data.insert(block_data.end(), new_blocks.begin(), new_blocks.end());
         
-        // Преобразуем в сообщения
         auto blocks = vaa_wrapper::toMessageBlocks(block_data);
         
         std::cout << COLOR_GREEN << "[" << current_time() << "] [FFMPEG] ✓ Generated " << blocks.size() 
