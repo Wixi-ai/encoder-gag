@@ -1,5 +1,6 @@
 add_library(ffmpeg_lib STATIC
     sources/ffmpeg_agent.cpp
+    sources/vaa_wrapper.cpp
 )
 
 target_include_directories(ffmpeg_lib PUBLIC

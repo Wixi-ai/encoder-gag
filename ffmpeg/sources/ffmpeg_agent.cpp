@@ -1,4 +1,5 @@
 #include "ffmpeg/ffmpeg_agent.hpp"
+#include "ffmpeg/vaa_wrapper.hpp"
 #include "utils/constants.hpp"
 #include <iostream>
 #include <cstdio>
@@ -18,11 +19,7 @@ std::mutex ffmpeg_agent_t::s_cache_mutex;
 
 static std::string msys2_to_win_path(const std::string& path) {
     if (path.empty()) return path;
-    // Уже Windows путь
-    if (path.length() > 2 && path[1] == ':') {
-        return path;
-    }
-    // Конвертация /c/path -> C:/path
+    if (path.length() > 2 && path[1] == ':') return path;
     if (path.length() > 2 && path[0] == '/' && isalpha(path[1])) {
         std::string drive = path.substr(1, 1);
         drive[0] = toupper(drive[0]);
@@ -46,7 +43,25 @@ static std::string random_string(int len) {
 }
 
 static std::string get_ffprobe_path() {
-    return "C:/tools/ffprobe.exe";
+    const char* path = std::getenv("FFPROBE_PATH");
+    if (path && path[0] != '\0') return std::string(path);
+    
+    std::vector<std::string> paths = {
+        "ffprobe",
+        "/usr/bin/ffprobe",
+        "/usr/local/bin/ffprobe",
+        "C:/tools/ffprobe.exe",
+        "C:/ffmpeg/bin/ffprobe.exe"
+    };
+    
+    for (const auto& p : paths) {
+        FILE* f = fopen(p.c_str(), "rb");
+        if (f) {
+            fclose(f);
+            return p;
+        }
+    }
+    return "ffprobe";
 }
 
 ffmpeg_agent_t::ffmpeg_agent_t(context_t ctx, so_5::mbox_t db_mbox)
@@ -94,7 +109,6 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
 
     LOG_INFO("FFMPEG", "Analyzing: " + win_path);
 
-    // Проверяем существование файла через stat
     FILE* f = fopen(win_path.c_str(), "rb");
     if (!f) {
         params.error_message = "File not found: " + win_path;
@@ -103,33 +117,19 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
     }
     fclose(f);
 
-    // Используем временный файл с простыми кавычками
-    std::string temp_file = "C:/Users/tungiia/ffprobe_out_" + random_string(8) + ".json";
-    std::string cmd = m_ffprobe_path + " -v quiet -print_format json -show_streams -show_format " + win_path + " > " + temp_file + " 2>&1";
+    std::string cmd = m_ffprobe_path + " -v quiet -print_format json -show_streams -show_format " + win_path;
     
-    LOG_INFO("FFMPEG", "Running: " + cmd);
-    
-    int ret = std::system(cmd.c_str());
-    
-    if (ret != 0) {
-        params.error_message = "ffprobe failed with code: " + std::to_string(ret);
-        LOG_ERROR("FFMPEG", params.error_message);
-        return params;
+    std::array<char, 128> buffer;
+    std::string output;
+    std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(cmd.c_str(), "r"), _pclose);
+    if (pipe) {
+        while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+            output += buffer.data();
+        }
     }
-    
-    std::ifstream ifs(temp_file);
-    if (!ifs.is_open()) {
-        params.error_message = "Cannot open temp file: " + temp_file;
-        LOG_ERROR("FFMPEG", params.error_message);
-        return params;
-    }
-    
-    std::string output((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-    ifs.close();
-    std::remove(temp_file.c_str());
     
     if (output.empty()) {
-        params.error_message = "ffprobe output empty";
+        params.error_message = "ffprobe returned empty output";
         LOG_ERROR("FFMPEG", params.error_message);
         return params;
     }
@@ -164,21 +164,6 @@ msg_video_params ffmpeg_agent_t::analyzeVideo(const std::string &file_path, cons
     return params;
 }
 
-std::vector<VaaBlock> ffmpeg_agent_t::generateVaaBlocks(const std::string &record_id, int duration_seconds) {
-    std::vector<VaaBlock> blocks;
-    int block_count = std::max(1, (duration_seconds + 9) / 10);
-    
-    for (int i = 0; i < block_count; i++) {
-        blocks.push_back({i, "video", i * 10 * 1000, 10000, "VIDEO_BLOCK_" + std::to_string(i)});
-    }
-    for (int i = 0; i < block_count; i++) {
-        blocks.push_back({i + block_count, "audio", i * 10 * 1000, 10000, "AUDIO_BLOCK_" + std::to_string(i)});
-    }
-    std::cout << COLOR_GREEN << "[" << current_time() << "] [FFMPEG] ✓ Generated " << blocks.size() 
-              << " VAA blocks for " << record_id.substr(0,8) << COLOR_RESET << std::endl;
-    return blocks;
-}
-
 void ffmpeg_agent_t::handleProcessVideo(const msg_process_video &msg) {
     m_processed_count++;
     LOG_INFO("FFMPEG", "Processing #" + std::to_string(m_processed_count) + " | id=" + msg.record_id.substr(0,8));
@@ -187,7 +172,19 @@ void ffmpeg_agent_t::handleProcessVideo(const msg_process_video &msg) {
     so_5::send<msg_video_params>(msg.reply_to, params);
     
     if (params.success) {
-        auto blocks = generateVaaBlocks(msg.record_id, static_cast<int>(params.duration));
+        int block_counter = 0;
+        std::vector<vaa_wrapper::VaaBlockData> block_data;
+        
+        // Используем обёртку для генерации блоков
+        auto new_blocks = vaa_wrapper::generateBlocksForFile(msg.file_path, msg.record_id, static_cast<int>(params.duration), block_counter);
+        block_data.insert(block_data.end(), new_blocks.begin(), new_blocks.end());
+        
+        // Преобразуем в сообщения
+        auto blocks = vaa_wrapper::toMessageBlocks(block_data);
+        
+        std::cout << COLOR_GREEN << "[" << current_time() << "] [FFMPEG] ✓ Generated " << blocks.size() 
+                  << " VAA blocks for " << msg.record_id.substr(0,8) << COLOR_RESET << std::endl;
+        
         msg_save_vaa_blocks save_msg{msg.record_id, blocks, msg.request_id, msg.reply_to};
         so_5::send<msg_save_vaa_blocks>(m_db_mbox, save_msg);
     }
