@@ -325,5 +325,4 @@ Client -> HTTP Agent -> FFmpeg Agent -> DB Agent -> SQLite3
 - Флаг `--noproxy "localhost"` необходим при работе через корпоративный прокси
 - ID записи должен быть в формате UUID (например, `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`)
 - FFmpeg должен быть установлен и доступен в PATH (для работы ffprobe)
-EOF
-```
+
